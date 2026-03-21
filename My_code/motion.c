@@ -13,40 +13,6 @@ double PI_VAL = 3.14159265358979323846;
 
 bool fivebar_forward(float theta1, float theta2, Point2D *P, bool elbow_up);
 bool fivebar_inverse(float x, float y,float *theta1,float *theta2,bool elbow_up);
-
-// int main(void)
-// {
-//     // 测试正运动学
-//     float theta1 = PI_VAL / 4.0f; // 45度
-//     float theta2 = PI_VAL / 3.0f; // 60度
-//     Point2D P;
-
-//     if (fivebar_forward(theta1, theta2, &P, true))
-//     {
-//         printf("正运动学结果: P(%.2f, %.2f)\n", P.x, P.y);
-//     }
-//     else
-//     {
-//         printf("正运动学计算失败，可能不在工作空间内。\n");
-//     }
-
-//     // 测试逆运动学
-//     float x = 150.0f;
-//     float y = 50.0f;
-//     float inv_theta1, inv_theta2;
-
-//     if (fivebar_inverse(x, y, &inv_theta1, &inv_theta2, true))
-//     {
-//         printf("逆运动学结果: theta1=%.2f rad, theta2=%.2f rad\n", inv_theta1, inv_theta2);
-//     }
-//     else
-//     {
-//         printf("逆运动学计算失败，可能不在工作空间内。\n");
-//     }
-
-//     return 0;
-// }
-
 /*
  * @brief  椭圆轨迹足端位置计算
  *
@@ -209,3 +175,18 @@ bool fivebar_inverse(float x, float y,
 
     return true;
 }
+
+/*
+ * @brief  输出轴角度 → 转子角度
+ *
+ * @param  theta_out   输出轴目标角 (rad)
+ * @param  param       关节参数
+ *
+ * @return 转子目标角 (rad)
+ */
+float output_to_rotor(float theta_out, JointParam *param)
+{
+    return ((theta_out-param->output_zero) * param->ratio) / param->dir
+           + param->rotor_zero;
+}
+

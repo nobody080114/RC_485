@@ -41,7 +41,8 @@
 
 /* Private define ------------------------------------------------------------*/
 /* USER CODE BEGIN PD */
-
+#define TWO_PI  (6.28318530717958647692f)
+#define PI      (3.14159265358979323846f)
 /* USER CODE END PD */
 
 /* Private macro -------------------------------------------------------------*/
@@ -54,15 +55,15 @@
 /* USER CODE BEGIN PV */
 
 RS485_Scheduler_t rs485;
-char Point[20]; 
+FootTrajParam traj_param;
 Point2D P;
+JointParam joint_param;
 float theta1, theta2;
-float t =0.0f;
 static float time = 0.0f;
 float dt = 0.01f;
-FootTrajParam traj_param;
-uint8_t len;
-#define PI_VAL 3.14159265358979323846
+float theta1_out, theta2_out;
+
+
 /* USER CODE END PV */
 
 /* Private function prototypes -----------------------------------------------*/
@@ -118,6 +119,11 @@ int main(void)
   HAL_Delay(500);
   P.x = 0.0f;
   P.y = 0.0f;
+
+  joint_param.rotor_zero = 0.0f;// 根据实际安装调整零位
+  joint_param.ratio = 6.33f;
+  joint_param.dir = 1;
+
   traj_param.step_length  = 40.0f;
   traj_param.step_height  = 25.0f;
   traj_param.stand_height = -150.0f;
@@ -132,17 +138,17 @@ int main(void)
   //RS485_1
   cmd_0.id = 0;     cmd_1.id = 1;     cmd_2.id = 2;    cmd_3.id = 3;
   cmd_0.mode = 1;   cmd_1.mode = 1;   cmd_2.mode = 1;  cmd_3.mode = 1;
-  cmd_0.K_P = 0.3;    cmd_1.K_P = 0.3;    cmd_2.K_P = 0.3;   cmd_3.K_P = 0.3;
-  cmd_0.K_W = 0.1;  cmd_1.K_W = 0.1;  cmd_2.K_W = 0.1; cmd_3.K_W = 0.1;
-  cmd_0.Pos = PI_VAL;    cmd_1.Pos = PI_VAL;    cmd_2.Pos = PI_VAL;   cmd_3.Pos = PI_VAL;
+  cmd_0.K_P = 0;    cmd_1.K_P = 0;    cmd_2.K_P = 0;   cmd_3.K_P = 0;
+  cmd_0.K_W = 0;  cmd_1.K_W = 0;  cmd_2.K_W = 0; cmd_3.K_W = 0;
+  cmd_0.Pos = 0;    cmd_1.Pos = 0;    cmd_2.Pos = 0;   cmd_3.Pos = 0;
   cmd_0.W = 0;      cmd_1.W = 0;      cmd_2.W = 0;     cmd_3.W = 0;
   cmd_0.T = 0;      cmd_1.T = 0;      cmd_2.T = 0;     cmd_3.T = 0;
   //RS485_2
   cmd_4.id = 4;     cmd_5.id = 5;     cmd_6.id = 6;    cmd_7.id = 7;
   cmd_4.mode = 1;   cmd_5.mode = 1;   cmd_6.mode = 1;  cmd_7.mode = 1;
-  cmd_4.K_P = 0.3;    cmd_5.K_P = 0.3;    cmd_6.K_P = 0.3;   cmd_7.K_P = 0.3;
-  cmd_4.K_W = 0.1;  cmd_5.K_W = 0.1;  cmd_6.K_W = 0.1; cmd_7.K_W = 0.1;
-  cmd_4.Pos = PI_VAL;    cmd_5.Pos = PI_VAL;    cmd_6.Pos = PI_VAL;   cmd_7.Pos = PI_VAL;
+  cmd_4.K_P = 0;    cmd_5.K_P = 0;    cmd_6.K_P = 0;   cmd_7.K_P = 0;
+  cmd_4.K_W = 0;  cmd_5.K_W = 0;  cmd_6.K_W = 0; cmd_7.K_W = 0;
+  cmd_4.Pos = 0;    cmd_5.Pos = 0;    cmd_6.Pos = 0;   cmd_7.Pos = 0;
   cmd_4.W = 0;      cmd_5.W = 0;      cmd_6.W = 0;     cmd_7.W = 0;
   cmd_4.T = 0;      cmd_5.T = 0;      cmd_6.T = 0;     cmd_7.T = 0;
   HAL_TIM_Base_Start_IT(&htim1); // 启动定时器1的中断，定时器1的周期由cubemx设置，这里是1ms
@@ -226,13 +232,16 @@ void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim)
     {
 
         time += dt;
-        // foot_ellipse_trajectory(time, &traj_param, &P.x, &P.y);
+        foot_ellipse_trajectory(time, &traj_param, &P.x, &P.y);
         // // len = snprintf(Point, sizeof(Point), "%.2f,%.2f\n", P.x, P.y);
-        // fivebar_inverse(P.x, P.y, &theta1, &theta2, true);
+        fivebar_inverse(P.x, P.y, &theta1_out, &theta2_out, true);
         // fivebar_forward(theta1, theta2, &P, true);
         // len = snprintf(Point, sizeof(Point), "%.2f,%.2f\n", P.x, P.y);
         // HAL_UART_Transmit_IT(&huart2, (uint8_t *)Point, len);
-        
+        theta1 = output_to_rotor(theta1_out, &joint_param);
+        theta2 = output_to_rotor(theta2_out, &joint_param);
+        cmd_0.Pos = theta1;
+        cmd_1.Pos = theta2;
         // RS485_Schedule(&rs485_1, &huart2);
         // RS485_Schedule(&rs485_2, &huart3);
     }
