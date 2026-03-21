@@ -62,7 +62,7 @@ static float time = 0.0f;
 float dt = 0.01f;
 FootTrajParam traj_param;
 uint8_t len;
-
+#define PI_VAL 3.14159265358979323846
 /* USER CODE END PV */
 
 /* Private function prototypes -----------------------------------------------*/
@@ -115,7 +115,7 @@ int main(void)
   MX_USART3_UART_Init();
   /* USER CODE BEGIN 2 */
   DWT_Init();
-  HAL_Delay(100);
+  HAL_Delay(500);
   P.x = 0.0f;
   P.y = 0.0f;
   traj_param.step_length  = 40.0f;
@@ -132,17 +132,17 @@ int main(void)
   //RS485_1
   cmd_0.id = 0;     cmd_1.id = 1;     cmd_2.id = 2;    cmd_3.id = 3;
   cmd_0.mode = 1;   cmd_1.mode = 1;   cmd_2.mode = 1;  cmd_3.mode = 1;
-  cmd_0.K_P = 0;    cmd_1.K_P = 0;    cmd_2.K_P = 0;   cmd_3.K_P = 0;
+  cmd_0.K_P = 0.3;    cmd_1.K_P = 0.3;    cmd_2.K_P = 0.3;   cmd_3.K_P = 0.3;
   cmd_0.K_W = 0.1;  cmd_1.K_W = 0.1;  cmd_2.K_W = 0.1; cmd_3.K_W = 0.1;
-  cmd_0.Pos = 0;    cmd_1.Pos = 0;    cmd_2.Pos = 0;   cmd_3.Pos = 0;
+  cmd_0.Pos = PI_VAL;    cmd_1.Pos = PI_VAL;    cmd_2.Pos = PI_VAL;   cmd_3.Pos = PI_VAL;
   cmd_0.W = 0;      cmd_1.W = 0;      cmd_2.W = 0;     cmd_3.W = 0;
   cmd_0.T = 0;      cmd_1.T = 0;      cmd_2.T = 0;     cmd_3.T = 0;
   //RS485_2
   cmd_4.id = 4;     cmd_5.id = 5;     cmd_6.id = 6;    cmd_7.id = 7;
   cmd_4.mode = 1;   cmd_5.mode = 1;   cmd_6.mode = 1;  cmd_7.mode = 1;
-  cmd_4.K_P = 0;    cmd_5.K_P = 0;    cmd_6.K_P = 0;   cmd_7.K_P = 0;
+  cmd_4.K_P = 0.3;    cmd_5.K_P = 0.3;    cmd_6.K_P = 0.3;   cmd_7.K_P = 0.3;
   cmd_4.K_W = 0.1;  cmd_5.K_W = 0.1;  cmd_6.K_W = 0.1; cmd_7.K_W = 0.1;
-  cmd_4.Pos = 0;    cmd_5.Pos = 0;    cmd_6.Pos = 0;   cmd_7.Pos = 0;
+  cmd_4.Pos = PI_VAL;    cmd_5.Pos = PI_VAL;    cmd_6.Pos = PI_VAL;   cmd_7.Pos = PI_VAL;
   cmd_4.W = 0;      cmd_5.W = 0;      cmd_6.W = 0;     cmd_7.W = 0;
   cmd_4.T = 0;      cmd_5.T = 0;      cmd_6.T = 0;     cmd_7.T = 0;
   HAL_TIM_Base_Start_IT(&htim1); // 启动定时器1的中断，定时器1的周期由cubemx设置，这里是1ms
