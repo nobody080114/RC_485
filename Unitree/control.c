@@ -30,6 +30,37 @@ MotorData_t *data_list[TOTAL_MOTOR_COUNT] = {
     &data_4, &data_5, &data_6, &data_7
 };
 
+static uint8_t is_motor_enabled(RS485_Scheduler_t *sch, uint8_t idx)
+{
+    return (sch->motor_enable_mask & (1U << idx)) != 0U;
+}
+
+/* 从 start_idx 开始查找下一个启用电机；无可用电机返回 TOTAL_MOTOR_COUNT */
+static uint8_t find_next_enabled_motor(RS485_Scheduler_t *sch, uint8_t start_idx)
+{
+    uint8_t i;
+
+    for(i = 0; i < TOTAL_MOTOR_COUNT; i++)
+    {
+        uint8_t idx = (start_idx + i) % TOTAL_MOTOR_COUNT;
+        if(is_motor_enabled(sch, idx))
+        {
+            return idx;
+        }
+    }
+
+    return TOTAL_MOTOR_COUNT;
+}
+
+static void move_to_next_enabled_motor(RS485_Scheduler_t *sch)
+{
+    uint8_t next = find_next_enabled_motor(sch, (sch->current_motor + 1U) % TOTAL_MOTOR_COUNT);
+    if(next < TOTAL_MOTOR_COUNT)
+    {
+        sch->current_motor = next;
+    }
+}
+
 /* 根据电机索引返回对应的 UART 外设 */
 static UART_HandleTypeDef *get_motor_uart(RS485_Scheduler_t *sch, uint8_t idx)
 {
@@ -44,13 +75,52 @@ static UART_HandleTypeDef *get_motor_uart(RS485_Scheduler_t *sch, uint8_t idx)
  */
 void RS485_Schedule(RS485_Scheduler_t *sch)
 {
+    uint8_t idx;
+    UART_HandleTypeDef *huart;
+
+    if((sch->motor_enable_mask & RS485_ALL_MOTOR_MASK) == 0U)
+    {
+        return;
+    }
+
     if(sch->tx_busy)   return;      // 正在发送，不操作
-    if(!sch->rx_ready) return;      // 上一帧未收完，不发下一帧
+
+    if(!sch->rx_ready)
+    {
+        if(sch->waiting_rx)
+        {
+            uint32_t elapsed = HAL_GetTick() - sch->rx_start_tick;
+            if(elapsed < sch->rx_timeout_ms)
+            {
+                return;
+            }
+
+            idx = sch->current_motor;
+            huart = get_motor_uart(sch, idx);
+            (void)HAL_UART_AbortReceive(huart);
+            data_list[idx]->timeout++;
+
+            sch->waiting_rx = 0;
+            sch->rx_ready = 1;
+            move_to_next_enabled_motor(sch);
+        }
+        else
+        {
+            return;
+        }
+    }
+
+    idx = find_next_enabled_motor(sch, sch->current_motor);
+    if(idx >= TOTAL_MOTOR_COUNT)
+    {
+        return;
+    }
+
+    sch->current_motor = idx;
+    huart = get_motor_uart(sch, idx);
 
     sch->rx_ready = 0;
-
-    uint8_t idx = sch->current_motor;
-    UART_HandleTypeDef *huart = get_motor_uart(sch, idx);
+    sch->waiting_rx = 0;
 
     modify_data(cmd_list[idx]);
 
@@ -58,7 +128,13 @@ void RS485_Schedule(RS485_Scheduler_t *sch)
     uint8_t *tx_buf = (idx < UART2_MOTOR_COUNT) ? dma_tx_buf_ch1 : dma_tx_buf_ch2;
     memcpy(tx_buf, &cmd_list[idx]->motor_send_data, sizeof(RIS_ControlData_t));
 
-    HAL_UART_Transmit_DMA(huart, tx_buf, sizeof(RIS_ControlData_t));
+    if(HAL_UART_Transmit_DMA(huart, tx_buf, sizeof(RIS_ControlData_t)) != HAL_OK)
+    {
+        sch->rx_ready = 1;
+        move_to_next_enabled_motor(sch);
+        return;
+    }
+
     sch->tx_busy = 1;
 }
 
@@ -75,7 +151,19 @@ void RS485_TxCpltHandler(RS485_Scheduler_t *sch, UART_HandleTypeDef *huart)
 
     /* 在 RAM_D2 DMA 缓冲区中接收 */
     uint8_t *rx_buf = (idx < UART2_MOTOR_COUNT) ? dma_rx_buf_ch1 : dma_rx_buf_ch2;
-    HAL_UART_Receive_DMA(huart, rx_buf, sizeof(RIS_MotorData_t));
+    if(HAL_UART_Receive_DMA(huart, rx_buf, sizeof(RIS_MotorData_t)) == HAL_OK)
+    {
+        sch->waiting_rx = 1;
+        sch->rx_start_tick = HAL_GetTick();
+    }
+    else
+    {
+        data_list[idx]->timeout++;
+        sch->waiting_rx = 0;
+        sch->rx_ready = 1;
+        move_to_next_enabled_motor(sch);
+    }
+
     sch->tx_busy = 0;
 }
 
@@ -88,12 +176,34 @@ void RS485_RxCpltHandler(RS485_Scheduler_t *sch, UART_HandleTypeDef *huart)
     uint8_t idx = sch->current_motor;
     UART_HandleTypeDef *expected = get_motor_uart(sch, idx);
 
+    if(!sch->waiting_rx) return;
     if(huart->Instance != expected->Instance) return;
 
     /* 将 RAM_D2 DMA 缓冲区数据复制回电机结构体，再解析 */
     uint8_t *rx_buf = (idx < UART2_MOTOR_COUNT) ? dma_rx_buf_ch1 : dma_rx_buf_ch2;
     memcpy(&data_list[idx]->motor_recv_data, rx_buf, sizeof(RIS_MotorData_t));
     extract_data(data_list[idx]);
-    sch->current_motor = (sch->current_motor + 1) % TOTAL_MOTOR_COUNT;
+
+    sch->waiting_rx = 0;
+    move_to_next_enabled_motor(sch);
     sch->rx_ready = 1;
+}
+
+void RS485_SetMotorMask(RS485_Scheduler_t *sch, uint16_t mask)
+{
+    sch->motor_enable_mask = mask & RS485_ALL_MOTOR_MASK;
+
+    if(sch->motor_enable_mask == 0U)
+    {
+        sch->waiting_rx = 0;
+        sch->rx_ready = 1;
+        return;
+    }
+
+    sch->current_motor = find_next_enabled_motor(sch, sch->current_motor);
+}
+
+void RS485_SetRxTimeout(RS485_Scheduler_t *sch, uint32_t timeout_ms)
+{
+    sch->rx_timeout_ms = (timeout_ms == 0U) ? RS485_RX_TIMEOUT_DEFAULT_MS : timeout_ms;
 }

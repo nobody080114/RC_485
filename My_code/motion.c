@@ -190,3 +190,14 @@ float output_to_rotor(float theta_out, JointParam *param)
            + param->rotor_zero;
 }
 
+/*
+ * @brief  角度归一化到 (-π, π]
+ */
+void wrap_pi_fast(float *angle)
+{
+    *angle = fmodf(*angle + PI, TWO_PI);
+    if (*angle < 0)
+        *angle += TWO_PI;
+    *angle -= PI;
+}
+

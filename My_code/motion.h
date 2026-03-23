@@ -3,6 +3,8 @@
 
 #include <stdbool.h>
 #include "stm32h7xx_hal.h"
+#define PI 3.1415926f
+#define TWO_PI (2.0f * PI)
 typedef struct {
     float x;
     float y;
@@ -28,4 +30,5 @@ bool fivebar_forward(float theta1, float theta2, Point2D *P, bool elbow_up);
 bool fivebar_inverse(float x, float y,float *theta1,float *theta2,bool elbow_up);
 void foot_ellipse_trajectory(float time,FootTrajParam *param,float *x,float *y);
 float output_to_rotor(float theta_out, JointParam *param);
+void wrap_pi_fast(float *angle);
 #endif // MOTION_H
