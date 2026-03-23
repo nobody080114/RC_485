@@ -145,6 +145,7 @@ bool fivebar_inverse(float x, float y,
                      float *theta2,
                      bool elbow_up)
 {
+    float angle_1,angle_2;
     float r = sqrtf(x*x + y*y);
     if (r < EPS)
         return false;
@@ -164,15 +165,22 @@ bool fivebar_inverse(float x, float y,
 
     if (elbow_up)
     {
-        *theta1 = alpha + delta;
-        *theta2 = alpha - delta;
+        angle_1 = alpha + delta;
+        angle_2 = alpha - delta;
+        // *theta1 = alpha + delta;
+        // *theta2 = alpha - delta;
     }
     else
     {
-        *theta1 = alpha - delta;
-        *theta2 = alpha + delta;
+        angle_1 = alpha - delta;
+        angle_2 = alpha + delta;
+        // *theta1 = alpha - delta;
+        // *theta2 = alpha + delta;
     }
-
+    wrap_pi_fast((&angle_1));
+    wrap_pi_fast((&angle_2));
+    *theta1 = angle_1;
+    *theta2 = angle_2;
     return true;
 }
 
@@ -191,13 +199,38 @@ float output_to_rotor(float theta_out, JointParam *param)
 }
 
 /*
+ * @brief  转子轴角度 → 输出轴角度
+ *
+ * @param  theta_in    转子轴当前角 (rad)
+ * @param  param       关节参数
+ *
+ * @return 输出轴目标角 (rad)
+ */
+float rotor_to_output(float rotor_now, JointParam *param)
+{
+    
+    // return ((rotor_now-param->rotor_zero) * param->dir) / param->ratio
+    //        + param->output_zero;
+    if((rotor_now-param->rotor_zero)!=0)
+    {
+        return ((rotor_now-param->rotor_zero) * param->dir) / param->ratio
+               + param->output_zero;
+    }
+    else
+    {
+        return param->output_zero;
+    }
+}
+
+/*
  * @brief  角度归一化到 (-π, π]
  */
 void wrap_pi_fast(float *angle)
 {
-    *angle = fmodf(*angle + PI, TWO_PI);
-    if (*angle < 0)
-        *angle += TWO_PI;
-    *angle -= PI;
+    float a;
+    a = fmodf(*angle + PI, TWO_PI);
+    if (a < 0)
+        a += TWO_PI;
+    *angle = a - PI;
 }
 
