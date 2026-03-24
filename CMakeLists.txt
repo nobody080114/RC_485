@@ -50,6 +50,7 @@ target_sources(${CMAKE_PROJECT_NAME} PRIVATE
     Unitree/control.c
     My_code/motion.c
     My_code/my_system.c
+    My_code/pid.c
 )
 
 # Add include paths

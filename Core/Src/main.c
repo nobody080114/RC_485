@@ -19,6 +19,7 @@
 /* Includes ------------------------------------------------------------------*/
 #include "main.h"
 #include "dma.h"
+#include "pid.h"
 #include "tim.h"
 #include "usart.h"
 #include "gpio.h"
@@ -33,6 +34,7 @@
 #include <math.h>
 #include <stdio.h>
 #include "my_system.h"
+#include "pid.h"
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -57,6 +59,7 @@ RS485_Scheduler_t rs485;
 FootTrajParam traj_param;
 Point2D P;
 JointParam joint_param_0, joint_param_1;
+PosPID_t Pospid[8];
 float time = 0.0f;
 float dt = 0.1f;
 float theta0_out = 0, theta1_out = 0;
@@ -173,7 +176,7 @@ int main(void)
     /* USER CODE END WHILE */
 
     /* USER CODE BEGIN 3 */
-    RS485_Schedule(&rs485);
+    // RS485_Schedule(&rs485);
     rotor_now_0 = data_0.Pos;
     rotor_now_1 = data_1.Pos;
     if(start)
@@ -182,9 +185,11 @@ int main(void)
         // wrap_pi_fast(&output_now_0);
         // output_now_1 = rotor_to_output(rotor_now_1, &joint_param_1);
         // wrap_pi_fast(&output_now_1);
-       
-        cmd_0.K_P = 0.1f;    cmd_1.K_P = 0.1f;
-        cmd_0.K_W = 0.003f;  cmd_1.K_W = 0.003f;
+        PosPID_Init(&Pospid[0], 0.12f, 0.0f, 0.004f, 0, 0.001f);
+        
+        PosPID_Init(&Pospid[1], 0.12f, 0.0f, 0.004f, 0, 0.001f);
+        // cmd_0.K_P = 0.1f;    cmd_1.K_P = 0.1f;
+        // cmd_0.K_W = 0.003f;  cmd_1.K_W = 0.003f;
     }
   }
   /* USER CODE END 3 */
@@ -275,19 +280,11 @@ void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim)
             foot_ellipse_trajectory(time, &traj_param, &P.x, &P.y);
             fivebar_inverse(P.x, P.y, &theta0_out, &theta1_out, true);
             cmd_0.Pos = output_to_rotor(theta0_out, &joint_param_0);
+            PosPID_UpdateCmd(&cmd_0, theta0_out, &Pospid[0]);
             cmd_1.Pos = output_to_rotor((PI-theta1_out), &joint_param_1);
+            PosPID_UpdateCmd(&cmd_1, (PI-theta1_out), &Pospid[1]);
         }
-        // // len = snprintf(Point, sizeof(Point), "%.2f,%.2f\n", P.x, P.y);
-        
-        // wrap_pi_fast((&theta0_out));
-        // wrap_pi_fast((&theta1_out));
-        // theta1_out = PI - theta1_out;
-        // fivebar_forward(theta0, theta1, &P, true);
-        // len = snprintf(Point, sizeof(Point), "%.2f,%.2f\n", P.x, P.y);
-        // HAL_UART_Transmit_IT(&huart2, (uint8_t *)Point, len);
-        
-        // RS485_Schedule(&rs485_1, &huart2);
-        // RS485_Schedule(&rs485_2, &huart3);
+        RS485_Schedule(&rs485);
     }
 }
 
