@@ -176,7 +176,7 @@ int main(void)
     /* USER CODE END WHILE */
 
     /* USER CODE BEGIN 3 */
-    // RS485_Schedule(&rs485);
+    RS485_Schedule(&rs485);
     rotor_now_0 = data_0.Pos;
     rotor_now_1 = data_1.Pos;
     if(start)
@@ -284,7 +284,7 @@ void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim)
             cmd_1.Pos = output_to_rotor((PI-theta1_out), &joint_param_1);
             PosPID_UpdateCmd(&cmd_1, (PI-theta1_out), &Pospid[1]);
         }
-        RS485_Schedule(&rs485);
+        
     }
 }
 
