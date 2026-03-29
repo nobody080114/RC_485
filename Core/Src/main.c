@@ -58,7 +58,7 @@
 RS485_Scheduler_t rs485;
 FootTrajParam traj_param;
 Point2D P;
-JointParam joint_param_0, joint_param_1;
+JointParam joint_param_0, joint_param_1, joint_param_2, joint_param_3, joint_param_4, joint_param_5, joint_param_6, joint_param_7;
 PosPID_t Pospid[8];
 float time = 0.0f;
 float dt = 0.1f;
@@ -133,6 +133,36 @@ int main(void)
   joint_param_1.ratio = 6.33f;
   joint_param_1.dir = -1;
 
+  joint_param_2.rotor_zero = 0.0f;// 根据实际转子调整零位
+  joint_param_2.output_zero = PI;// 根据实际安装调整零位
+  joint_param_2.ratio = 6.33f;
+  joint_param_2.dir = -1;
+
+  joint_param_3.rotor_zero = 0.0f;// 根据实际转子调整零位
+  joint_param_3.output_zero = PI;// 根据实际安装调整零位
+  joint_param_3.ratio = 6.33f;
+  joint_param_3.dir = -1;
+
+  joint_param_4.rotor_zero = 0.0f;// 根据实际转子调整零位
+  joint_param_4.output_zero = PI;// 根据实际安装调整零位
+  joint_param_4.ratio = 6.33f;
+  joint_param_4.dir = -1;
+
+  joint_param_5.rotor_zero = 0.0f;// 根据实际转子调整零位
+  joint_param_5.output_zero = PI;// 根据实际安装调整零位
+  joint_param_5.ratio = 6.33f;
+  joint_param_5.dir = -1;
+
+  joint_param_6.rotor_zero = 0.0f;// 根据实际转子调整零位
+  joint_param_6.output_zero = 0;// 根据实际安装调整零位
+  joint_param_6.ratio = 6.33f;
+  joint_param_6.dir = -1;
+
+  joint_param_7.rotor_zero = 0.0f;// 根据实际转子调整零位
+  joint_param_7.output_zero = 0;// 根据实际安装调整零位
+  joint_param_7.ratio = 6.33f;
+  joint_param_7.dir = -1;
+
   traj_param.step_length  = 40.0f;
   traj_param.step_height  = 25.0f;
   traj_param.stand_height = -150.0f;
@@ -147,22 +177,22 @@ int main(void)
   rs485.huart_ch1 = &huart2;
   rs485.huart_ch2 = &huart3;
   RS485_SetRxTimeout(&rs485, 10U);
-  // RS485_SetMotorMask(&rs485, RS485_ALL_MOTOR_MASK); // 改这里可选择本次参与读写的电机
-  RS485_SetMotorMask(&rs485, (1U << 0) | (1U << 1)); // 只读写电机0和1
+  RS485_SetMotorMask(&rs485, RS485_ALL_MOTOR_MASK); // 改这里可选择本次参与读写的电机
+  // RS485_SetMotorMask(&rs485, (1U << 0) | (1U << 1)); // 只读写电机0和1
 
   //RS485_1
   cmd_0.id = 0;     cmd_1.id = 1;     cmd_2.id = 2;    cmd_3.id = 3;
   cmd_0.mode = 1;   cmd_1.mode = 1;   cmd_2.mode = 1;  cmd_3.mode = 1;
-  cmd_0.K_P = 0;    cmd_1.K_P = 0;    cmd_2.K_P = 0.7;   cmd_3.K_P = 0.7;
-  cmd_0.K_W = 0;  cmd_1.K_W = 0;  cmd_2.K_W = 0.1; cmd_3.K_W = 0.1;
+  cmd_0.K_P = 0;    cmd_1.K_P = 0;    cmd_2.K_P = 0;   cmd_3.K_P = 0;
+  cmd_0.K_W = 0;  cmd_1.K_W = 0;  cmd_2.K_W = 0; cmd_3.K_W = 0;
   cmd_0.Pos = 0;    cmd_1.Pos = 0;    cmd_2.Pos = 0;   cmd_3.Pos = 0;
   cmd_0.W = 0;      cmd_1.W = 0;      cmd_2.W = 0;     cmd_3.W = 0;
   cmd_0.T = 0;      cmd_1.T = 0;      cmd_2.T = 0;     cmd_3.T = 0;
   //RS485_2
   cmd_4.id = 4;     cmd_5.id = 5;     cmd_6.id = 6;    cmd_7.id = 7;
   cmd_4.mode = 1;   cmd_5.mode = 1;   cmd_6.mode = 1;  cmd_7.mode = 1;
-  cmd_4.K_P = 0.7;    cmd_5.K_P = 0.7;    cmd_6.K_P = 0.7;   cmd_7.K_P = 0.7;
-  cmd_4.K_W = 0.1;  cmd_5.K_W = 0.1;  cmd_6.K_W = 0.1; cmd_7.K_W = 0.1;
+  cmd_4.K_P = 0;    cmd_5.K_P = 0;    cmd_6.K_P = 0;   cmd_7.K_P = 0;
+  cmd_4.K_W = 0;  cmd_5.K_W = 0;  cmd_6.K_W = 0; cmd_7.K_W = 0;
   cmd_4.Pos = 0;    cmd_5.Pos = 0;    cmd_6.Pos = 0;   cmd_7.Pos = 0;
   cmd_4.W = 0;      cmd_5.W = 0;      cmd_6.W = 0;     cmd_7.W = 0;
   cmd_4.T = 0;      cmd_5.T = 0;      cmd_6.T = 0;     cmd_7.T = 0;
@@ -177,17 +207,28 @@ int main(void)
 
     /* USER CODE BEGIN 3 */
     RS485_Schedule(&rs485);
-    rotor_now_0 = data_0.Pos;
-    rotor_now_1 = data_1.Pos;
+    // rotor_now_0 = data_0.Pos;
+    // rotor_now_1 = data_1.Pos;
+    // rotor_now_2 = data_2.Pos;
+    // rotor_now_3 = data_3.Pos;
+    // rotor_now_4 = data_4.Pos;
+    // rotor_now_5 = data_5.Pos;
+    // rotor_now_6 = data_6.Pos;
+    // rotor_now_7 = data_7.Pos;
     if(start)
     {
         // output_now_0 = rotor_to_output(rotor_now_0, &joint_param_0);
         // wrap_pi_fast(&output_now_0);
         // output_now_1 = rotor_to_output(rotor_now_1, &joint_param_1);
         // wrap_pi_fast(&output_now_1);
-        PosPID_Init(&Pospid[0], 0.12f, 0.0f, 0.004f, 0, 0.001f);
-        
+        PosPID_Init(&Pospid[0], 0.12f, 0.0f, 0.004f, 0, 0.001f);  
         PosPID_Init(&Pospid[1], 0.12f, 0.0f, 0.004f, 0, 0.001f);
+        PosPID_Init(&Pospid[2], 0.12f, 0.0f, 0.004f, 0, 0.001f);
+        PosPID_Init(&Pospid[3], 0.12f, 0.0f, 0.004f, 0, 0.001f);
+        PosPID_Init(&Pospid[4], 0.12f, 0.0f, 0.004f, 0, 0.001f);
+        PosPID_Init(&Pospid[5], 0.12f, 0.0f, 0.004f, 0, 0.001f);
+        PosPID_Init(&Pospid[6], 0.12f, 0.0f, 0.004f, 0, 0.001f);
+        PosPID_Init(&Pospid[7], 0.12f, 0.0f, 0.004f, 0, 0.001f);
         // cmd_0.K_P = 0.1f;    cmd_1.K_P = 0.1f;
         // cmd_0.K_W = 0.003f;  cmd_1.K_W = 0.003f;
     }
@@ -269,6 +310,12 @@ void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim)
                 start = 1;
                 joint_param_0.rotor_zero = data_0.Pos;
                 joint_param_1.rotor_zero = data_1.Pos;
+                joint_param_2.rotor_zero = data_2.Pos;
+                joint_param_3.rotor_zero = data_3.Pos;
+                joint_param_4.rotor_zero = data_4.Pos;
+                joint_param_5.rotor_zero = data_5.Pos;
+                joint_param_6.rotor_zero = data_6.Pos;
+                joint_param_7.rotor_zero = data_7.Pos;
                 time = 0.0f;
                 start_1 = 0;
             }
@@ -279,10 +326,48 @@ void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim)
             if(time > traj_param.period) time -= traj_param.period;
             foot_ellipse_trajectory(time, &traj_param, &P.x, &P.y);
             fivebar_inverse(P.x, P.y, &theta0_out, &theta1_out, true);
-            cmd_0.Pos = output_to_rotor(theta0_out, &joint_param_0);
-            PosPID_UpdateCmd(&cmd_0, theta0_out, &Pospid[0]);
-            cmd_1.Pos = output_to_rotor((PI-theta1_out), &joint_param_1);
-            PosPID_UpdateCmd(&cmd_1, (PI-theta1_out), &Pospid[1]);
+
+            // cmd_0.Pos = output_to_rotor(theta0_out, &joint_param_0);
+            // PosPID_UpdateCmd(&cmd_0, theta0_out, &Pospid[0]);//反向
+            cmd_0.Pos = output_to_rotor((PI-theta1_out), &joint_param_0);
+            PosPID_UpdateCmd(&cmd_0, (PI-theta1_out), &Pospid[0]);//正向
+            
+            // cmd_2.Pos = output_to_rotor((PI-theta0_out), &joint_param_2);
+            // PosPID_UpdateCmd(&cmd_2, (PI-theta0_out), &Pospid[2]); //反向
+            cmd_2.Pos = output_to_rotor(theta1_out, &joint_param_2);
+            PosPID_UpdateCmd(&cmd_2, theta1_out, &Pospid[2]); //正向
+
+            // cmd_4.Pos = output_to_rotor((PI-theta0_out), &joint_param_4);
+            // PosPID_UpdateCmd(&cmd_4, (PI-theta0_out), &Pospid[4]);//反向
+            cmd_4.Pos = output_to_rotor(theta1_out, &joint_param_4);
+            PosPID_UpdateCmd(&cmd_4, theta1_out, &Pospid[4]);//正向
+
+            // cmd_7.Pos = output_to_rotor(theta0_out, &joint_param_7);
+            // PosPID_UpdateCmd(&cmd_7, theta0_out, &Pospid[7]);//反向
+            cmd_7.Pos = output_to_rotor((PI-theta1_out), &joint_param_7);
+            PosPID_UpdateCmd(&cmd_7, (PI-theta1_out), &Pospid[7]);//正向
+
+
+
+            // cmd_1.Pos = output_to_rotor((PI-theta1_out), &joint_param_1);
+            // PosPID_UpdateCmd(&cmd_1, (PI-theta1_out), &Pospid[1]);//反向
+            cmd_1.Pos = output_to_rotor(theta0_out, &joint_param_1);
+            PosPID_UpdateCmd(&cmd_1, theta0_out, &Pospid[1]);//正向
+
+            // cmd_3.Pos = output_to_rotor(theta1_out, &joint_param_3);
+            // PosPID_UpdateCmd(&cmd_3, theta1_out, &Pospid[3]);//反向
+            cmd_3.Pos = output_to_rotor((PI-theta0_out), &joint_param_3);
+            PosPID_UpdateCmd(&cmd_3, (PI-theta0_out), &Pospid[3]);//正向
+
+            // cmd_5.Pos = output_to_rotor(theta1_out, &joint_param_5);
+            // PosPID_UpdateCmd(&cmd_5, theta1_out, &Pospid[5]);//反向
+            cmd_5.Pos = output_to_rotor((PI-theta0_out), &joint_param_5);
+            PosPID_UpdateCmd(&cmd_5, (PI-theta0_out), &Pospid[5]);//正向
+
+            // cmd_6.Pos = output_to_rotor((PI-theta1_out), &joint_param_6);
+            // PosPID_UpdateCmd(&cmd_6, (PI-theta1_out), &Pospid[6]);//反向
+            cmd_6.Pos = output_to_rotor(theta0_out, &joint_param_6);
+            PosPID_UpdateCmd(&cmd_6, theta0_out, &Pospid[6]);//正向
         }
         
     }
