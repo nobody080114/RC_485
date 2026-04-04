@@ -129,14 +129,14 @@ void RS485_Schedule(RS485_Scheduler_t *sch)
     uint8_t *tx_buf = (idx < UART2_MOTOR_COUNT) ? dma_tx_buf_ch1 : dma_tx_buf_ch2;
     memcpy(tx_buf, &cmd_list[idx]->motor_send_data, sizeof(RIS_ControlData_t));
 
-    if(HAL_UART_Transmit_DMA(huart, tx_buf, sizeof(RIS_ControlData_t)) != HAL_OK)
+    if(HAL_UART_Transmit_DMA(huart, tx_buf, sizeof(RIS_ControlData_t)) != HAL_OK)// 表示启动 DMA 发送失败
     {
         sch->rx_ready = 1;
         move_to_next_enabled_motor(sch);
         return;
     }
 
-    sch->tx_busy = 1;
+    sch->tx_busy = 1;// 发送成功，等待发送完成回调
 }
 
 /*
@@ -152,9 +152,9 @@ void RS485_TxCpltHandler(RS485_Scheduler_t *sch, UART_HandleTypeDef *huart)
 
     /* 在 RAM_D2 DMA 缓冲区中接收 */
     uint8_t *rx_buf = (idx < UART2_MOTOR_COUNT) ? dma_rx_buf_ch1 : dma_rx_buf_ch2;
-    if(HAL_UARTEx_ReceiveToIdle_DMA(huart, rx_buf, sizeof(RIS_MotorData_t)) == HAL_OK)
+    if(HAL_UARTEx_ReceiveToIdle_DMA(huart, rx_buf, sizeof(RIS_MotorData_t)) == HAL_OK)// 表示启用空闲中断接收成功
     {
-        if(huart->hdmarx != NULL)
+        if(huart->hdmarx != NULL)/// 表示DMA接收通道有效
         {
             __HAL_DMA_DISABLE_IT(huart->hdmarx, DMA_IT_HT);
         }

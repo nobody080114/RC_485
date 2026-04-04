@@ -76,6 +76,10 @@ target_include_directories(${CMAKE_PROJECT_NAME} PRIVATE
 */
 
 /*
-    Debug看波形时候，尽量不要有中间量，容易使得波形大幅抖动
+    ozone Debug看波形时候，因为初始单位较小会有较大振幅，属正常现象
 */
+
+
+
+
 

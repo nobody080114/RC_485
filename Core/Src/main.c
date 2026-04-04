@@ -19,7 +19,6 @@
 /* Includes ------------------------------------------------------------------*/
 #include "main.h"
 #include "dma.h"
-#include "pid.h"
 #include "tim.h"
 #include "usart.h"
 #include "gpio.h"
@@ -35,7 +34,7 @@
 #include <stdio.h>
 #include "my_system.h"
 #include "pid.h"
-#include "elrs.h"
+#include "CRSF.h"
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -67,7 +66,7 @@ float theta0_out = 0, theta1_out = 0;
 uint8_t start = 0,start_1 = 0;
 float rotor_now_0, rotor_now_1;
 float output_now_0, output_now_1;
-
+uint32_t zhen = 0,cnt = 0;
 /* USER CODE END PV */
 
 /* Private function prototypes -----------------------------------------------*/
@@ -118,6 +117,7 @@ int main(void)
   MX_USART2_UART_Init();
   MX_TIM1_Init();
   MX_USART3_UART_Init();
+  MX_UART5_Init();
   /* USER CODE BEGIN 2 */
   DWT_Init();
   HAL_Delay(500);
@@ -199,7 +199,9 @@ int main(void)
   cmd_4.W = 0;      cmd_5.W = 0;      cmd_6.W = 0;     cmd_7.W = 0;
   cmd_4.T = 0;      cmd_5.T = 0;      cmd_6.T = 0;     cmd_7.T = 0;
   HAL_TIM_Base_Start_IT(&htim1); // 启动定时器1的中断，定时器1的周期由cubemx设置，这里是1ms
-  
+  CRSF_Init();
+
+  // HAL_UART_Receive_IT(&huart5, (uint8_t *)pData, 26);
   /* USER CODE END 2 */
 
   /* Infinite loop */
@@ -210,14 +212,9 @@ int main(void)
 
     /* USER CODE BEGIN 3 */
     RS485_Schedule(&rs485);
-    // rotor_now_0 = data_0.Pos;
-    // rotor_now_1 = data_1.Pos;
-    // rotor_now_2 = data_2.Pos;
-    // rotor_now_3 = data_3.Pos;
-    // rotor_now_4 = data_4.Pos;
-    // rotor_now_5 = data_5.Pos;
-    // rotor_now_6 = data_6.Pos;
-    // rotor_now_7 = data_7.Pos;
+    CRSF_Decode();
+    Key_Control();
+    cnt++;
     if(start)
     {
         // output_now_0 = rotor_to_output(rotor_now_0, &joint_param_0);
@@ -232,8 +229,6 @@ int main(void)
         PosPID_Init(&Pospid[5], 0.12f, 0.0f, 0.004f, 0, 0.001f);
         PosPID_Init(&Pospid[6], 0.12f, 0.0f, 0.004f, 0, 0.001f);
         PosPID_Init(&Pospid[7], 0.12f, 0.0f, 0.004f, 0, 0.001f);
-        // cmd_0.K_P = 0.1f;    cmd_1.K_P = 0.1f;
-        // cmd_0.K_W = 0.003f;  cmd_1.K_W = 0.003f;
     }
   }
   /* USER CODE END 3 */
@@ -304,10 +299,16 @@ void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim)
     if(htim->Instance == TIM1) //check if the interrupt comes from TIM1
     {
         static uint16_t count = 0;
+        static uint16_t count_1 = 0;
+        count_1++;
+        if(count_1>=1000)
+        {
+          zhen = cnt;
+          cnt = 0;
+        }
         if(start_1)
         {
             if(count < 1000)count++;
-            // if(count >= 10.f) 
             if(count>= 1000&&start==0)
             {
                 start = 1;
@@ -387,19 +388,18 @@ void HAL_UARTEx_RxEventCallback(UART_HandleTypeDef *huart, uint16_t Size)
 {
     if(huart->Instance == USART2 || huart->Instance == USART3)
     {
-    RS485_RxCpltHandler(&rs485, huart, Size);
+      RS485_RxCpltHandler(&rs485, huart, Size);
     }
 }
 
-// void HAL_UARTEx_RxEventCallback(UART_HandleTypeDef *huart, uint16_t Size)
-//     {
-//         if(huart->Instance == USART1) //check if the interrupt comes from USART1
-//         {
-//             HAL_UART_Transmit_DMA(&huart1, pData, Size); //echo the received data
-            // HAL_UARTEx_ReceiveToIdle_DMA(&huart1, pData, sizeof(pData));
-            // __HAL_DMA_DISABLE_IT(&hdma_usart1_rx, DMA_IT_HT);
-//         }
-//     }
+void HAL_UART_RxCpltCallback(UART_HandleTypeDef *huart)
+{
+    // 这个回调函数在使用空闲中断接收时不会被调用，可以留空或者删除
+    if(huart->Instance == UART5)
+    {
+      CRSF_AcceptData();
+    }
+}
 
 /* USER CODE END 4 */
 
