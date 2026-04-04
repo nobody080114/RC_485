@@ -25,7 +25,7 @@ typedef struct
 
 void RS485_Schedule(RS485_Scheduler_t *sch);
 void RS485_TxCpltHandler(RS485_Scheduler_t *sch, UART_HandleTypeDef *huart);
-void RS485_RxCpltHandler(RS485_Scheduler_t *sch, UART_HandleTypeDef *huart);
+void RS485_RxCpltHandler(RS485_Scheduler_t *sch, UART_HandleTypeDef *huart, uint16_t size);
 void RS485_SetMotorMask(RS485_Scheduler_t *sch, uint16_t mask);
 void RS485_SetRxTimeout(RS485_Scheduler_t *sch, uint32_t timeout_ms);
 

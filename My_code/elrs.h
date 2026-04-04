@@ -1,6 +1,6 @@
 #ifndef __ELRS_H__
 #define __ELRS_H__
-#include "main.h"
+#include "stm32h7xx_hal.h"
 #define MAX_FRAME_SIZE 36 // 空闲中断接收的最大帧长
 
 /*

@@ -35,6 +35,7 @@
 #include <stdio.h>
 #include "my_system.h"
 #include "pid.h"
+#include "elrs.h"
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -176,6 +177,7 @@ int main(void)
   rs485.rx_start_tick = 0;
   rs485.huart_ch1 = &huart2;
   rs485.huart_ch2 = &huart3;
+
   RS485_SetRxTimeout(&rs485, 10U);
   RS485_SetMotorMask(&rs485, RS485_ALL_MOTOR_MASK); // 改这里可选择本次参与读写的电机
   // RS485_SetMotorMask(&rs485, (1U << 0) | (1U << 1) | (1U << 2) | (1U << 3)| (1U << 4) | (1U << 5) | (1U << 6) | (1U << 7)); // 只读写电机0和1
@@ -197,6 +199,7 @@ int main(void)
   cmd_4.W = 0;      cmd_5.W = 0;      cmd_6.W = 0;     cmd_7.W = 0;
   cmd_4.T = 0;      cmd_5.T = 0;      cmd_6.T = 0;     cmd_7.T = 0;
   HAL_TIM_Base_Start_IT(&htim1); // 启动定时器1的中断，定时器1的周期由cubemx设置，这里是1ms
+  
   /* USER CODE END 2 */
 
   /* Infinite loop */
@@ -380,10 +383,23 @@ void HAL_UART_TxCpltCallback(UART_HandleTypeDef *huart)
     RS485_TxCpltHandler(&rs485, huart);
 }
 
-void HAL_UART_RxCpltCallback(UART_HandleTypeDef *huart)
+void HAL_UARTEx_RxEventCallback(UART_HandleTypeDef *huart, uint16_t Size)
 {
-    RS485_RxCpltHandler(&rs485, huart);
+    if(huart->Instance == USART2 || huart->Instance == USART3)
+    {
+    RS485_RxCpltHandler(&rs485, huart, Size);
+    }
 }
+
+// void HAL_UARTEx_RxEventCallback(UART_HandleTypeDef *huart, uint16_t Size)
+//     {
+//         if(huart->Instance == USART1) //check if the interrupt comes from USART1
+//         {
+//             HAL_UART_Transmit_DMA(&huart1, pData, Size); //echo the received data
+            // HAL_UARTEx_ReceiveToIdle_DMA(&huart1, pData, sizeof(pData));
+            // __HAL_DMA_DISABLE_IT(&hdma_usart1_rx, DMA_IT_HT);
+//         }
+//     }
 
 /* USER CODE END 4 */
 

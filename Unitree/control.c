@@ -152,8 +152,12 @@ void RS485_TxCpltHandler(RS485_Scheduler_t *sch, UART_HandleTypeDef *huart)
 
     /* 在 RAM_D2 DMA 缓冲区中接收 */
     uint8_t *rx_buf = (idx < UART2_MOTOR_COUNT) ? dma_rx_buf_ch1 : dma_rx_buf_ch2;
-    if(HAL_UART_Receive_DMA(huart, rx_buf, sizeof(RIS_MotorData_t)) == HAL_OK)
+    if(HAL_UARTEx_ReceiveToIdle_DMA(huart, rx_buf, sizeof(RIS_MotorData_t)) == HAL_OK)
     {
+        if(huart->hdmarx != NULL)
+        {
+            __HAL_DMA_DISABLE_IT(huart->hdmarx, DMA_IT_HT);
+        }
         sch->waiting_rx = 1;
         sch->rx_start_tick = HAL_GetTick();
     }
@@ -169,16 +173,26 @@ void RS485_TxCpltHandler(RS485_Scheduler_t *sch, UART_HandleTypeDef *huart)
 }
 
 /*
- * 接收完成回调处理 - 在 HAL_UART_RxCpltCallback 中调用
+ * 接收完成回调处理 - 在 HAL_UARTEx_RxEventCallback 中调用
  * 解析数据后，推进到下一个电机，标记 rx_ready 触发下一轮调度
  */
-void RS485_RxCpltHandler(RS485_Scheduler_t *sch, UART_HandleTypeDef *huart)
+void RS485_RxCpltHandler(RS485_Scheduler_t *sch, UART_HandleTypeDef *huart, uint16_t size)
 {
     uint8_t idx = sch->current_motor;
     UART_HandleTypeDef *expected = get_motor_uart(sch, idx);
+    const uint16_t expected_len = (uint16_t)sizeof(RIS_MotorData_t);
 
     if(!sch->waiting_rx) return;
     if(huart->Instance != expected->Instance) return;
+
+    if(size != expected_len)
+    {
+        data_list[idx]->timeout++;
+        sch->waiting_rx = 0;
+        move_to_next_enabled_motor(sch);
+        sch->rx_ready = 1;
+        return;
+    }
 
     /* 将 RAM_D2 DMA 缓冲区数据复制回电机结构体，再解析 */
     uint8_t *rx_buf = (idx < UART2_MOTOR_COUNT) ? dma_rx_buf_ch1 : dma_rx_buf_ch2;
