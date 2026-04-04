@@ -51,6 +51,7 @@ target_sources(${CMAKE_PROJECT_NAME} PRIVATE
     My_code/motion.c
     My_code/my_system.c
     My_code/pid.c
+    My_code/elrs.c
 )
 
 # Add include paths
