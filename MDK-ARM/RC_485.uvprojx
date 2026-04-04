@@ -338,9 +338,9 @@
             <v6Rtti>0</v6Rtti>
             <VariousControls>
               <MiscControls></MiscControls>
-              <Define>USE_PWR_LDO_SUPPLY,USE_HAL_DRIVER,STM32H723xx</Define>
+              <Define>USE_PWR_LDO_SUPPLY,USE_HAL_DRIVER,STM32H723xx,ARM_MATH_DSP,ARM_MATH_MATRIX_CHECK,ARM_MATH_ROUNDING</Define>
               <Undefine></Undefine>
-              <IncludePath>../Core/Inc;../Drivers/STM32H7xx_HAL_Driver/Inc;../Drivers/STM32H7xx_HAL_Driver/Inc/Legacy;../Drivers/CMSIS/Device/ST/STM32H7xx/Include;../Drivers/CMSIS/Include;..\My_code;..\Unitree</IncludePath>
+              <IncludePath>../Core/Inc;../Drivers/STM32H7xx_HAL_Driver/Inc;../Drivers/STM32H7xx_HAL_Driver/Inc/Legacy;../Drivers/CMSIS/Device/ST/STM32H7xx/Include;../Drivers/CMSIS/Include;../My_code;../Unitree;..\Drivers\CMSIS\DSP\Lib\ARM;..\Drivers\CMSIS\DSP\Include</IncludePath>
             </VariousControls>
           </Cads>
           <Aads>
@@ -544,21 +544,31 @@
               <FileType>1</FileType>
               <FilePath>../Core/Src/system_stm32h7xx.c</FilePath>
             </File>
+            <File>
+              <FileName>arm_cortexM7lfdp_math.lib</FileName>
+              <FileType>4</FileType>
+              <FilePath>..\Drivers\CMSIS\DSP\Lib\ARM\arm_cortexM7lfdp_math.lib</FilePath>
+            </File>
+            <File>
+              <FileName>arm_common_tables.h</FileName>
+              <FileType>5</FileType>
+              <FilePath>..\Drivers\CMSIS\DSP\Include\arm_common_tables.h</FilePath>
+            </File>
+            <File>
+              <FileName>arm_const_structs.h</FileName>
+              <FileType>5</FileType>
+              <FilePath>..\Drivers\CMSIS\DSP\Include\arm_const_structs.h</FilePath>
+            </File>
+            <File>
+              <FileName>arm_math.h</FileName>
+              <FileType>5</FileType>
+              <FilePath>..\Drivers\CMSIS\DSP\Include\arm_math.h</FilePath>
+            </File>
           </Files>
         </Group>
         <Group>
           <GroupName>My_code</GroupName>
           <Files>
-            <File>
-              <FileName>elrs.c</FileName>
-              <FileType>1</FileType>
-              <FilePath>..\My_code\elrs.c</FilePath>
-            </File>
-            <File>
-              <FileName>elrs.h</FileName>
-              <FileType>5</FileType>
-              <FilePath>..\My_code\elrs.h</FilePath>
-            </File>
             <File>
               <FileName>motion.c</FileName>
               <FileType>1</FileType>
@@ -593,6 +603,16 @@
               <FileName>pid.h</FileName>
               <FileType>5</FileType>
               <FilePath>..\My_code\pid.h</FilePath>
+            </File>
+            <File>
+              <FileName>CRSF.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>..\My_code\CRSF.c</FilePath>
+            </File>
+            <File>
+              <FileName>CRSF.h</FileName>
+              <FileType>5</FileType>
+              <FilePath>..\My_code\CRSF.h</FilePath>
             </File>
           </Files>
         </Group>

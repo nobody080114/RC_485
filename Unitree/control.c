@@ -2,6 +2,7 @@
 #include "stm32h7xx_hal_uart.h"
 #include <string.h>
 #include "motion.h"
+
 MotorCmd_t  cmd_0 = {0}, cmd_1 = {0}, cmd_2 = {0}, cmd_3 = {0},
             cmd_4 = {0}, cmd_5 = {0}, cmd_6 = {0}, cmd_7 = {0};
 MotorData_t data_0 = {0}, data_1 = {0}, data_2 = {0}, data_3 = {0},

@@ -43,4 +43,4 @@ rc_485/main.o: ..\Core\Src\main.c ..\Core\Inc\main.h \
   D:\Program\ Files\ (x86)\Keil5\ARM\ARMCLANG\include\stdbool.h \
   D:\Program\ Files\ (x86)\Keil5\ARM\ARMCLANG\include\string.h \
   D:\Program\ Files\ (x86)\Keil5\ARM\ARMCLANG\include\stdio.h \
-  ..\My_code\my_system.h ..\My_code\pid.h ..\My_code\elrs.h
+  ..\My_code\my_system.h ..\My_code\pid.h ..\My_code\CRSF.h

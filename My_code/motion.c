@@ -5,6 +5,7 @@
 #include <stdbool.h>
 #include <stdio.h>
 #include "motion.h"
+#include "arm_math.h"
 #define L1 100.0f
 #define L2 200.0f
 #define EPS 1e-6f
@@ -38,7 +39,7 @@ void foot_ellipse_trajectory(float time,FootTrajParam *param,float *x,float *y)
     float phi = fmodf(omega * time, 2.0f * PI_VAL);
 
     // X方向：完整余弦椭圆
-    *x = 0.5f * param->step_length * cosf(phi);
+    *x = 0.5f * param->step_length * arm_cos_f32(phi);
 
     // 支撑相（贴地）
     if (phi < PI_VAL)
@@ -64,12 +65,12 @@ void foot_ellipse_trajectory(float time,FootTrajParam *param,float *x,float *y)
 bool fivebar_forward(float theta1, float theta2, Point2D *P, bool elbow_up)
 {
     // 主动杆端点 A
-    float Ax = L1 * cosf(theta1);
-    float Ay = L1 * sinf(theta1);
+    float Ax = L1 * arm_cos_f32(theta1);
+    float Ay = L1 * arm_sin_f32(theta1);
 
     // 主动杆端点 B
-    float Bx = L1 * cosf(theta2);
-    float By = L1 * sinf(theta2);
+    float Bx = L1 * arm_cos_f32(theta2);
+    float By = L1 * arm_sin_f32(theta2);
 
     // AB 向量
     float dx = Bx - Ax;
