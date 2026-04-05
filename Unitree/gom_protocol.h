@@ -7,10 +7,10 @@
  * @copyright Copyright (c) unitree robotics .co.ltd. 2022
  */
 
-#ifndef __GO_PROTOCOL_H
-#define __GO_PROTOCOL_H
+#ifndef GOM_PROTOCOL_H
+#define GOM_PROTOCOL_H
 
-#include "crc_ccitt.h"
+#include <stdint.h> 
 
 #pragma pack(1)
 /**

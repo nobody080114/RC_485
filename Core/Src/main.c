@@ -25,16 +25,8 @@
 
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
-#include "gom_protocol.h"
-#include "control.h"
-#include "motion.h"
-#include <stdint.h>
-#include <string.h>
-#include <math.h>
-#include <stdio.h>
-#include "my_system.h"
-#include "pid.h"
-#include "CRSF.h"
+
+// #include "CRSF.h"
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -218,7 +210,7 @@ int main(void)
     /* USER CODE BEGIN 3 */
     RS485_Schedule(&rs485);
     CRSF_Decode();
-    Key_Control();
+    // Key_Control();
     cnt++;
     if(start)
     {

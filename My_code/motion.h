@@ -1,9 +1,8 @@
 #ifndef MOTION_H
 #define MOTION_H
 
+#include "main.h"
 #include <stdbool.h>
-#include "stm32h7xx_hal.h"
-#define PI 3.1415926f
 #define TWO_PI (2.0f * PI)
 typedef struct {
     float x;

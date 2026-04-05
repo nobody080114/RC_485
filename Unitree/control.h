@@ -1,8 +1,11 @@
 #ifndef __CONTROL_H
 #define __CONTROL_H
 
-#include "stm32h7xx_hal.h"
+#include <stdint.h>
 #include "gom_protocol.h"
+
+/* Forward declaration is enough because this header only stores UART handle pointers. */
+typedef struct __UART_HandleTypeDef UART_HandleTypeDef;
 
 #define UART2_MOTOR_COUNT  4    // UART2 上的电机数量 (id 0~3)
 #define UART3_MOTOR_COUNT  4    // UART3 上的电机数量 (id 4~7)

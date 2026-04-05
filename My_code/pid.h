@@ -2,7 +2,6 @@
 #define PID_H
 
 #include "gom_protocol.h"
-
 typedef struct
 {
 	float kp;

@@ -1,11 +1,7 @@
 /*
     正运动结算
 */
-#include <math.h>
-#include <stdbool.h>
-#include <stdio.h>
 #include "motion.h"
-#include "arm_math.h"
 #define L1 100.0f
 #define L2 200.0f
 #define EPS 1e-6f

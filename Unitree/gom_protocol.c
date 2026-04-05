@@ -1,4 +1,6 @@
 #include "gom_protocol.h"
+#include "crc_ccitt.h"
+
 #include <string.h>
 
 #define SATURATE(_IN, _MIN, _MAX) \

@@ -1,16 +1,12 @@
 #include "CRSF.h"
-#include "usart.h"
 
-// __attribute__((section(".RAM_D2")))
-// uint8_t UARTRxData = 0;
-// __attribute__((section(".RAM_D2")))
-// static uint8_t UARTRxBuff[26];
-// __attribute__((section(".RAM_D2")))
-// static uint16_t CRSF[16];
+
 
 uint8_t UARTRxData = 0;
-static uint8_t UARTRxBuff[26];
-static uint16_t CRSF[16];
+uint8_t UARTRxBuff[26];
+uint16_t CRSF[16];
+
+
 /**
   * 函    数：CRSF初始化
   * 参    数：无
@@ -18,7 +14,7 @@ static uint16_t CRSF[16];
   */
 void CRSF_Init(void)
 {
-    HAL_UART_Receive_IT(&huart5, UARTRxBuff,26);
+    HAL_UART_Receive_IT(&huart5, &UARTRxData,1);
 }
 
 
@@ -108,17 +104,5 @@ uint16_t CRSF_GetData(uint8_t Channelx)
     return temp;
 }
 
-void Key_Control(void)
-{
-  int16_t Key1  = CRSF_GetData(1);
-	int16_t Key2  = CRSF_GetData(2);
-	int16_t Key3  = CRSF_GetData(3);
-  int16_t Key4  = CRSF_GetData(4);
-	int16_t Key5  = CRSF_GetData(5);
-	int16_t Key6  = CRSF_GetData(6);
-  int16_t Key7  = CRSF_GetData(7);
-	int16_t Key8  = CRSF_GetData(8);
-	int16_t Key9  = CRSF_GetData(9);
-  int16_t Key10 = CRSF_GetData(10);
-}
+
 

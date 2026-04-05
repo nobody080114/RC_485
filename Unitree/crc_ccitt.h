@@ -1,8 +1,7 @@
 #ifndef __CRC_CCITT_H
 #define __CRC_CCITT_H
 
-#include <stdint.h>
-#include <stdlib.h>
+#include "main.h"
 
 
 uint16_t crc_ccitt_byte(uint16_t crc, const uint8_t c);

@@ -31,7 +31,28 @@ extern "C" {
 
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
+#include "main.h"
+#include "dma.h"
+#include "tim.h"
+#include "usart.h"
+#include "gpio.h"
 
+#include "gom_protocol.h"
+#include "control.h"
+#include "motion.h"
+#include <stdint.h>
+#include <string.h>
+#include <math.h>
+#include <stdio.h>
+#include "my_system.h"
+#include "pid.h"
+#include "CRSF.h"
+#include <math.h>
+#include "arm_math.h"
+#include <stdlib.h>
+#include <stdbool.h>
+#include "crc_ccitt.h"
+// #include "control.h"
 /* USER CODE END Includes */
 
 /* Exported types ------------------------------------------------------------*/
