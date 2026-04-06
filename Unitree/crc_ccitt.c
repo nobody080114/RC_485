@@ -60,3 +60,47 @@ uint16_t crc_ccitt(uint16_t crc, uint8_t const *buffer, size_t len)
 		crc = crc_ccitt_byte(crc, *buffer++);
 	return crc;
 }
+
+// 逐位（bitwise）算法：最通用、和协议定义最贴近，缺点是比查表慢一点，但CRSF帧很短完全够用
+uint8_t crsf_crc8_compute(const uint8_t *data, size_t len)
+{
+    const uint8_t poly = 0xD5;
+    uint8_t crc = 0x00;
+
+    for (size_t i = 0; i < len; i++) {
+        crc ^= data[i];
+        for (int b = 0; b < 8; b++) {
+            if (crc & 0x80) {
+                crc = (uint8_t)((crc << 1) ^ poly);
+            } else {
+                crc = (uint8_t)(crc << 1);
+            }
+        }
+    }
+    return crc;
+}
+
+int crsf_frame_crc_ok(const uint8_t *buf, size_t frame_len)
+{
+    // 最小：sync + size + type + crc = 4
+    if (!buf || frame_len < 4) return 0;
+
+    // 可选：检查sync
+    // if (buf[0] != 0xC8) return 0;
+
+    const uint8_t size = buf[1];
+
+    // 在常见 CRSF 定义里：size = (type..crc) 的字节数
+    // 所以整帧长度应为 size + 2（前面还有sync和size两个字节）
+    if ((size_t)(size + 2) != frame_len) return 0;
+
+    const uint8_t received_crc = buf[frame_len - 1];
+
+    // CRC 覆盖：从 type 开始，共 (size - 1) 字节（不含最后的crc字节）
+    const uint8_t *crc_region = &buf[2];
+    const size_t crc_len = (size_t)size - 1;
+
+    const uint8_t calc = crsf_crc8_compute(crc_region, crc_len);
+    return (calc == received_crc) ? 1 : 0;
+}
+

@@ -22,6 +22,7 @@
 #include "tim.h"
 #include "usart.h"
 #include "gpio.h"
+#include <stdint.h>
 
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
@@ -55,10 +56,11 @@ PosPID_t Pospid[8];
 float time = 0.0f;
 float dt = 0.1f;
 float theta0_out = 0, theta1_out = 0;
-uint8_t start = 0,start_1 = 0;
+int8_t start = 0,start_1 = 0,run  = 0,flag_1 = 0,mode = 0,Enable = 0;
 float rotor_now_0, rotor_now_1;
 float output_now_0, output_now_1;
 uint32_t zhen = 0,cnt = 0;
+uint16_t Key[10];
 /* USER CODE END PV */
 
 /* Private function prototypes -----------------------------------------------*/
@@ -209,24 +211,38 @@ int main(void)
 
     /* USER CODE BEGIN 3 */
     RS485_Schedule(&rs485);
-    CRSF_Decode();
-    // Key_Control();
+    // CRSF_Decode();
+    CRSF_Key_Get(Key);
+    if(Key[7] == 1792) run = 1; else run = 0;///右按键
+    if(Key[8] == 1792) start_1 = 1; else start_1 = 0;//左上长按键
+    if(Key[4] == 1792) Enable = 1; else Enable = 0;//左按键
+    if(Key[5] == 191) mode = 1; else if(Key[5] == 997) mode = 2; else if(Key[5] == 1792) mode = 3;//左拨键
     cnt++;
-    if(start)
+    if(Enable)
     {
-        // output_now_0 = rotor_to_output(rotor_now_0, &joint_param_0);
-        // wrap_pi_fast(&output_now_0);
-        // output_now_1 = rotor_to_output(rotor_now_1, &joint_param_1);
-        // wrap_pi_fast(&output_now_1);
-        PosPID_Init(&Pospid[0], 0.12f, 0.0f, 0.004f, 0, 0.001f);  
-        PosPID_Init(&Pospid[1], 0.12f, 0.0f, 0.004f, 0, 0.001f);
-        PosPID_Init(&Pospid[2], 0.12f, 0.0f, 0.004f, 0, 0.001f);
-        PosPID_Init(&Pospid[3], 0.12f, 0.0f, 0.004f, 0, 0.001f);
-        PosPID_Init(&Pospid[4], 0.12f, 0.0f, 0.004f, 0, 0.001f);
-        PosPID_Init(&Pospid[5], 0.12f, 0.0f, 0.004f, 0, 0.001f);
-        PosPID_Init(&Pospid[6], 0.12f, 0.0f, 0.004f, 0, 0.001f);
-        PosPID_Init(&Pospid[7], 0.12f, 0.0f, 0.004f, 0, 0.001f);
+        if(flag_1 == 1)
+        {
+          PosPID_Init(&Pospid[0], 0.24f, 0.0f, 0.004f, 0, 0.001f);  
+          PosPID_Init(&Pospid[1], 0.24f, 0.0f, 0.004f, 0, 0.001f);
+          PosPID_Init(&Pospid[2], 0.24f, 0.0f, 0.004f, 0, 0.001f);
+          PosPID_Init(&Pospid[3], 0.24f, 0.0f, 0.004f, 0, 0.001f);
+          PosPID_Init(&Pospid[4], 0.24f, 0.0f, 0.004f, 0, 0.001f);
+          PosPID_Init(&Pospid[5], 0.24f, 0.0f, 0.004f, 0, 0.001f);
+          PosPID_Init(&Pospid[6], 0.24f, 0.0f, 0.004f, 0, 0.001f);
+          PosPID_Init(&Pospid[7], 0.24f, 0.0f, 0.004f, 0, 0.001f);
+        }
     }
+    else
+    {
+      PosPID_Init(&Pospid[0], 0, 0, 0, 0, 0);  
+      PosPID_Init(&Pospid[1], 0, 0, 0, 0, 0);
+      PosPID_Init(&Pospid[2], 0, 0, 0, 0, 0);
+      PosPID_Init(&Pospid[3], 0, 0, 0, 0, 0);
+      PosPID_Init(&Pospid[4], 0, 0, 0, 0, 0);
+      PosPID_Init(&Pospid[5], 0, 0, 0, 0, 0);
+      PosPID_Init(&Pospid[6], 0, 0, 0, 0, 0);
+      PosPID_Init(&Pospid[7], 0, 0, 0, 0, 0);
+    } 
   }
   /* USER CODE END 3 */
 }
@@ -303,12 +319,11 @@ void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim)
           zhen = cnt;
           cnt = 0;
         }
-        if(start_1)
+        if((start_1 == 1)&&(flag_1==0))
         {
             if(count < 1000)count++;
-            if(count>= 1000&&start==0)
+            if(count>= 1000)
             {
-                start = 1;
                 joint_param_0.rotor_zero = data_0.Pos;
                 joint_param_1.rotor_zero = data_1.Pos;
                 joint_param_2.rotor_zero = data_2.Pos;
@@ -318,61 +333,139 @@ void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim)
                 joint_param_6.rotor_zero = data_6.Pos;
                 joint_param_7.rotor_zero = data_7.Pos;
                 time = 0.0f;
-                start_1 = 0;
+                flag_1 = 1;
             }
         }
-        if(start)
+        if(flag_1 == 1)
         {
-            time += dt;
-            if(time > traj_param.period) time -= traj_param.period;
-            foot_ellipse_trajectory(time, &traj_param, &P.x, &P.y);
-            fivebar_inverse(P.x, P.y, &theta0_out, &theta1_out, true);//左前腿和右后腿 0，1，4，5
+            if((run == 1))
+            {
+                if(mode == 1)
+                {
+                  cmd_0.Pos = joint_param_0.rotor_zero;
+                  cmd_1.Pos = joint_param_1.rotor_zero;
+                  cmd_2.Pos = joint_param_2.rotor_zero;
+                  cmd_3.Pos = joint_param_3.rotor_zero;
+                  cmd_4.Pos = joint_param_4.rotor_zero;
+                  cmd_5.Pos = joint_param_5.rotor_zero;
+                  cmd_6.Pos = joint_param_6.rotor_zero;
+                  cmd_7.Pos = joint_param_7.rotor_zero;
+                }
+                if(mode == 2)
+                {
+                    time += dt;
+                    if(time > traj_param.period) time -= traj_param.period;
+                    foot_ellipse_trajectory(time, &traj_param, &P.x, &P.y);
+                    fivebar_inverse(P.x, P.y, &theta0_out, &theta1_out, true);//左前腿和右后腿 0，1，4，5
 
-            // cmd_0.Pos = output_to_rotor(theta0_out, &joint_param_0);
-            // PosPID_UpdateCmd(&cmd_0, theta0_out, &Pospid[0]);//反向
-            cmd_0.Pos = output_to_rotor((PI-theta1_out), &joint_param_0);
-            PosPID_UpdateCmd(&cmd_0, (PI-theta1_out), &Pospid[0]);//正向
+                    // cmd_0.Pos = output_to_rotor(theta0_out, &joint_param_0);
+                    // PosPID_UpdateCmd(&cmd_0, theta0_out, &Pospid[0]);//反向
+                    cmd_0.Pos = output_to_rotor((PI-theta1_out), &joint_param_0);
+                    PosPID_UpdateCmd(&cmd_0, (PI-theta1_out), &Pospid[0]);//正向
 
-            // cmd_1.Pos = output_to_rotor((PI-theta1_out), &joint_param_1);
-            // PosPID_UpdateCmd(&cmd_1, (PI-theta1_out), &Pospid[1]);//反向
-            cmd_1.Pos = output_to_rotor(theta0_out, &joint_param_1);
-            PosPID_UpdateCmd(&cmd_1, theta0_out, &Pospid[1]);//正向
+                    // cmd_1.Pos = output_to_rotor((PI-theta1_out), &joint_param_1);
+                    // PosPID_UpdateCmd(&cmd_1, (PI-theta1_out), &Pospid[1]);//反向
+                    cmd_1.Pos = output_to_rotor(theta0_out, &joint_param_1);
+                    PosPID_UpdateCmd(&cmd_1, theta0_out, &Pospid[1]);//正向
 
-            // cmd_4.Pos = output_to_rotor((PI-theta0_out), &joint_param_4);
-            // PosPID_UpdateCmd(&cmd_4, (PI-theta0_out), &Pospid[4]);//反向
-            cmd_4.Pos = output_to_rotor(theta1_out, &joint_param_4);
-            PosPID_UpdateCmd(&cmd_4, theta1_out, &Pospid[4]);//正向
+                    // cmd_4.Pos = output_to_rotor((PI-theta0_out), &joint_param_4);
+                    // PosPID_UpdateCmd(&cmd_4, (PI-theta0_out), &Pospid[4]);//反向
+                    cmd_4.Pos = output_to_rotor(theta1_out, &joint_param_4);
+                    PosPID_UpdateCmd(&cmd_4, theta1_out, &Pospid[4]);//正向
+                    
+                    // cmd_5.Pos = output_to_rotor(theta1_out, &joint_param_5);
+                    // PosPID_UpdateCmd(&cmd_5, theta1_out, &Pospid[5]);//反向
+                    cmd_5.Pos = output_to_rotor((PI-theta0_out), &joint_param_5);
+                    PosPID_UpdateCmd(&cmd_5, (PI-theta0_out), &Pospid[5]);//正向
+
+
+                    foot_ellipse_trajectory((time+traj_param.period/2.0f), &traj_param, &P.x, &P.y);
+                    fivebar_inverse(P.x, P.y, &theta0_out, &theta1_out, true);//左后腿和右前腿 2，3，6，7   
+                    
+                    // cmd_2.Pos = output_to_rotor((PI-theta0_out), &joint_param_2);
+                    // PosPID_UpdateCmd(&cmd_2, (PI-theta0_out), &Pospid[2]); //反向
+                    cmd_2.Pos = output_to_rotor(theta1_out, &joint_param_2);
+                    PosPID_UpdateCmd(&cmd_2, theta1_out, &Pospid[2]); //正向        
+
+                    // cmd_7.Pos = output_to_rotor(theta0_out, &joint_param_7);
+                    // PosPID_UpdateCmd(&cmd_7, theta0_out, &Pospid[7]);//反向
+                    cmd_7.Pos = output_to_rotor((PI-theta1_out), &joint_param_7);
+                    PosPID_UpdateCmd(&cmd_7, (PI-theta1_out), &Pospid[7]);//正向
             
-            // cmd_5.Pos = output_to_rotor(theta1_out, &joint_param_5);
-            // PosPID_UpdateCmd(&cmd_5, theta1_out, &Pospid[5]);//反向
-            cmd_5.Pos = output_to_rotor((PI-theta0_out), &joint_param_5);
-            PosPID_UpdateCmd(&cmd_5, (PI-theta0_out), &Pospid[5]);//正向
+                    // cmd_3.Pos = output_to_rotor(theta1_out, &joint_param_3);
+                    // PosPID_UpdateCmd(&cmd_3, theta1_out, &Pospid[3]);//反向
+                    cmd_3.Pos = output_to_rotor((PI-theta0_out), &joint_param_3);
+                    PosPID_UpdateCmd(&cmd_3, (PI-theta0_out), &Pospid[3]);//正向
+
+                    // cmd_6.Pos = output_to_rotor((PI-theta1_out), &joint_param_6);
+                    // PosPID_UpdateCmd(&cmd_6, (PI-theta1_out), &Pospid[6]);//反向
+                    cmd_6.Pos = output_to_rotor(theta0_out, &joint_param_6);
+                    PosPID_UpdateCmd(&cmd_6, theta0_out, &Pospid[6]);//正向
+                }
+                if(mode == 3)
+                {
+                    time += dt;
+                    if(time > traj_param.period) time -= traj_param.period;
+                    foot_ellipse_trajectory(time, &traj_param, &P.x, &P.y);
+                    fivebar_inverse(P.x, P.y, &theta0_out, &theta1_out, true);//左前腿和右后腿 0，1，4，5
+
+                    cmd_0.Pos = output_to_rotor(theta0_out, &joint_param_0);
+                    PosPID_UpdateCmd(&cmd_0, theta0_out, &Pospid[0]);//反向
+                    // cmd_0.Pos = output_to_rotor((PI-theta1_out), &joint_param_0);
+                    // PosPID_UpdateCmd(&cmd_0, (PI-theta1_out), &Pospid[0]);//正向
+
+                    cmd_1.Pos = output_to_rotor((PI-theta1_out), &joint_param_1);
+                    PosPID_UpdateCmd(&cmd_1, (PI-theta1_out), &Pospid[1]);//反向
+                    // cmd_1.Pos = output_to_rotor(theta0_out, &joint_param_1);
+                    // PosPID_UpdateCmd(&cmd_1, theta0_out, &Pospid[1]);//正向
+
+                    cmd_4.Pos = output_to_rotor((PI-theta0_out), &joint_param_4);
+                    PosPID_UpdateCmd(&cmd_4, (PI-theta0_out), &Pospid[4]);//反向
+                    // cmd_4.Pos = output_to_rotor(theta1_out, &joint_param_4);
+                    // PosPID_UpdateCmd(&cmd_4, theta1_out, &Pospid[4]);//正向
+                    
+                    cmd_5.Pos = output_to_rotor(theta1_out, &joint_param_5);
+                    PosPID_UpdateCmd(&cmd_5, theta1_out, &Pospid[5]);//反向
+                    // cmd_5.Pos = output_to_rotor((PI-theta0_out), &joint_param_5);
+                    // PosPID_UpdateCmd(&cmd_5, (PI-theta0_out), &Pospid[5]);//正向
 
 
-            foot_ellipse_trajectory((time+traj_param.period/2.0f), &traj_param, &P.x, &P.y);
-            fivebar_inverse(P.x, P.y, &theta0_out, &theta1_out, true);//左后腿和右前腿 2，3，6，7   
+                    foot_ellipse_trajectory((time+traj_param.period/2.0f), &traj_param, &P.x, &P.y);
+                    fivebar_inverse(P.x, P.y, &theta0_out, &theta1_out, true);//左后腿和右前腿 2，3，6，7   
+                    
+                    cmd_2.Pos = output_to_rotor((PI-theta0_out), &joint_param_2);
+                    PosPID_UpdateCmd(&cmd_2, (PI-theta0_out), &Pospid[2]); //反向
+                    // cmd_2.Pos = output_to_rotor(theta1_out, &joint_param_2);
+                    // PosPID_UpdateCmd(&cmd_2, theta1_out, &Pospid[2]); //正向        
+
+                    cmd_7.Pos = output_to_rotor(theta0_out, &joint_param_7);
+                    PosPID_UpdateCmd(&cmd_7, theta0_out, &Pospid[7]);//反向
+                    // cmd_7.Pos = output_to_rotor((PI-theta1_out), &joint_param_7);
+                    // PosPID_UpdateCmd(&cmd_7, (PI-theta1_out), &Pospid[7]);//正向
             
-            // cmd_2.Pos = output_to_rotor((PI-theta0_out), &joint_param_2);
-            // PosPID_UpdateCmd(&cmd_2, (PI-theta0_out), &Pospid[2]); //反向
-            cmd_2.Pos = output_to_rotor(theta1_out, &joint_param_2);
-            PosPID_UpdateCmd(&cmd_2, theta1_out, &Pospid[2]); //正向        
+                    cmd_3.Pos = output_to_rotor(theta1_out, &joint_param_3);
+                    PosPID_UpdateCmd(&cmd_3, theta1_out, &Pospid[3]);//反向
+                    // cmd_3.Pos = output_to_rotor((PI-theta0_out), &joint_param_3);
+                    // PosPID_UpdateCmd(&cmd_3, (PI-theta0_out), &Pospid[3]);//正向
 
-            // cmd_7.Pos = output_to_rotor(theta0_out, &joint_param_7);
-            // PosPID_UpdateCmd(&cmd_7, theta0_out, &Pospid[7]);//反向
-            cmd_7.Pos = output_to_rotor((PI-theta1_out), &joint_param_7);
-            PosPID_UpdateCmd(&cmd_7, (PI-theta1_out), &Pospid[7]);//正向
-    
-            // cmd_3.Pos = output_to_rotor(theta1_out, &joint_param_3);
-            // PosPID_UpdateCmd(&cmd_3, theta1_out, &Pospid[3]);//反向
-            cmd_3.Pos = output_to_rotor((PI-theta0_out), &joint_param_3);
-            PosPID_UpdateCmd(&cmd_3, (PI-theta0_out), &Pospid[3]);//正向
-
-            // cmd_6.Pos = output_to_rotor((PI-theta1_out), &joint_param_6);
-            // PosPID_UpdateCmd(&cmd_6, (PI-theta1_out), &Pospid[6]);//反向
-            cmd_6.Pos = output_to_rotor(theta0_out, &joint_param_6);
-            PosPID_UpdateCmd(&cmd_6, theta0_out, &Pospid[6]);//正向
+                    cmd_6.Pos = output_to_rotor((PI-theta1_out), &joint_param_6);
+                    PosPID_UpdateCmd(&cmd_6, (PI-theta1_out), &Pospid[6]);//反向
+                    // cmd_6.Pos = output_to_rotor(theta0_out, &joint_param_6);
+                    // PosPID_UpdateCmd(&cmd_6, theta0_out, &Pospid[6]);//正向
+                }
+            }
+            else if (run == 0) 
+            {
+                cmd_0.Pos = joint_param_0.rotor_zero; PosPID_UpdateCmd(&cmd_0, cmd_0.Pos, &Pospid[0]);
+                cmd_1.Pos = joint_param_1.rotor_zero; PosPID_UpdateCmd(&cmd_1, cmd_1.Pos, &Pospid[1]);
+                cmd_2.Pos = joint_param_2.rotor_zero; PosPID_UpdateCmd(&cmd_2, cmd_2.Pos, &Pospid[2]);
+                cmd_3.Pos = joint_param_3.rotor_zero; PosPID_UpdateCmd(&cmd_3, cmd_3.Pos, &Pospid[3]);
+                cmd_4.Pos = joint_param_4.rotor_zero; PosPID_UpdateCmd(&cmd_4, cmd_4.Pos, &Pospid[4]);
+                cmd_5.Pos = joint_param_5.rotor_zero; PosPID_UpdateCmd(&cmd_5, cmd_5.Pos, &Pospid[5]);
+                cmd_6.Pos = joint_param_6.rotor_zero; PosPID_UpdateCmd(&cmd_6, cmd_6.Pos, &Pospid[6]);
+                cmd_7.Pos = joint_param_7.rotor_zero; PosPID_UpdateCmd(&cmd_7, cmd_7.Pos, &Pospid[7]);
+            }
         }
-        
     }
 }
 
@@ -387,16 +480,21 @@ void HAL_UARTEx_RxEventCallback(UART_HandleTypeDef *huart, uint16_t Size)
     {
       RS485_RxCpltHandler(&rs485, huart, Size);
     }
-}
-
-void HAL_UART_RxCpltCallback(UART_HandleTypeDef *huart)
-{
-    // 这个回调函数在使用空闲中断接收时不会被调用，可以留空或者删除
-    if(huart->Instance == UART5)
+    else if(huart->Instance == UART5)
     {
+      CRSF_Init();
       CRSF_AcceptData();
     }
 }
+
+// void HAL_UART_RxCpltCallback(UART_HandleTypeDef *huart)
+// {
+//     // 这个回调函数在使用空闲中断接收时不会被调用，可以留空或者删除
+//     if(huart->Instance == UART5)
+//     {
+//       CRSF_AcceptData();
+//     }
+// }
 
 /* USER CODE END 4 */
 
