@@ -29,10 +29,6 @@ void CRSF_AcceptData(void)
           UARTRxBuff[i-1] = TempRxBuff[i];
         }
     }
-        // for(i = 1;i < 26; i++)
-        // {
-        //   UARTRxBuff[i-1] = TempRxBuff[i];
-        // }
 
 }
 

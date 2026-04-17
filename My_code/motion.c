@@ -176,6 +176,14 @@ bool fivebar_inverse(float x, float y,
     }
     wrap_pi_fast((&angle_1));
     wrap_pi_fast((&angle_2));
+    // if(angle_1>-PI_VAL/2)
+    // {
+    //     *theta1 = angle_1;
+    // }
+    // if(angle_2>-PI_VAL&&angle_2<-0)
+    // {
+    //     *theta2 = angle_2;
+    // }
     *theta1 = angle_1;
     *theta2 = angle_2;
     return true;
@@ -191,8 +199,15 @@ bool fivebar_inverse(float x, float y,
  */
 float output_to_rotor(float theta_out, JointParam *param)
 {
+    if(theta_out-param->output_zero > PI)
+    return ((theta_out-param->output_zero-TWO_PI) * param->ratio) / param->dir
+        + param->rotor_zero;
+    else if(theta_out-param->output_zero < -PI)
+    return ((theta_out-param->output_zero+TWO_PI) * param->ratio) / param->dir
+        + param->rotor_zero;
+    else
     return ((theta_out-param->output_zero) * param->ratio) / param->dir
-           + param->rotor_zero;
+        + param->rotor_zero;
 }
 
 /*
@@ -201,7 +216,7 @@ float output_to_rotor(float theta_out, JointParam *param)
  * @param  theta_in    转子轴当前角 (rad)
  * @param  param       关节参数
  *
- * @return 输出轴目标角 (rad)
+ * @return 输出轴角 (rad)
  */
 float rotor_to_output(float rotor_now, JointParam *param)
 {
