@@ -12,6 +12,11 @@ set(CMAKE_C_STANDARD 11)
 set(CMAKE_C_STANDARD_REQUIRED ON)
 set(CMAKE_C_EXTENSIONS ON)
 
+# Default to STM32 ARM GCC toolchain when no toolchain is provided.
+if(NOT CMAKE_TOOLCHAIN_FILE)
+    set(CMAKE_TOOLCHAIN_FILE "${CMAKE_SOURCE_DIR}/cmake/gcc-arm-none-eabi.cmake" CACHE FILEPATH "Toolchain file")
+endif()
+
 
 # Define the build type
 if(NOT CMAKE_BUILD_TYPE)

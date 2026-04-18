@@ -51,17 +51,17 @@
 
 RS485_Scheduler_t rs485;
 FootTrajParam traj_param;
-Point2D P;
+Point2D P,need_P;
 JointParam joint_param_0, joint_param_1, joint_param_2, joint_param_3, joint_param_4, joint_param_5, joint_param_6, joint_param_7;
 PosPID_t Pospid[8];
 float time = 0.0f;
 float dt = 0.1f;
 float theta0_out = 0, theta1_out = 0;
 float go_0_pos=0,go_1_pos=0,go_2_pos=0,go_3_pos=0,go_4_pos=0,go_5_pos=0,go_6_pos=0,go_7_pos=0;
-int8_t start = 0,start_1 = 0,run  = 0,flag_1 = 0,mode = 0,Enable = 0,go_dir = 0;
+int8_t start = 0,start_1 = 0,run  = 0,flag_1 = 0,mode = 0,Enable = 0,go_dir = 0,stand_state = 0;
 //go_dir: 1-前进，2-后退，3-左移，4-右移
 uint16_t speed = 0;
-float rotor_now_0, rotor_now_1;
+float rotor_now_0, rotor_now_1,theta1_need, theta2_need;
 float output_now_0, output_now_1,output_now_2, output_now_3, output_now_4, output_now_5, output_now_6, output_now_7;
 uint32_t zhen = 0,cnt = 0;
 uint16_t Key[10];
@@ -126,44 +126,60 @@ int main(void)
   HAL_Delay(500);
   P.x = 0.0f;
   P.y = 0.0f;
+  // output_now_0 = -0.46094;
+  // output_now_1 = -2.68065;
+  // output_now_2 = -2.63684;
+  // output_now_3 = -0.46094;
+  // output_now_4 = -0.38362;
+  // output_now_5 = -2.87717;
+  // output_now_6 = -0.38362;
+  // output_now_7 = -2.87717;
 
   joint_param_0.rotor_zero = 0;// 根据实际安装调整零位
-  joint_param_0.output_zero = 0;// 根据实际安装调整零位
+  joint_param_0.output_zero = -0.46094;// 根据实际安装调整零位
+  // joint_param_0.output_zero = 0;// 根据实际安装调整零位
   joint_param_0.ratio = 6.33f;
   joint_param_0.dir = -1;
 
   joint_param_1.rotor_zero = 0.0f;// 根据实际安装调整零位
-  joint_param_1.output_zero = 0;// 根据实际安装调整零位
+  joint_param_1.output_zero = -2.68065;// 根据实际安装调整零位
+  // joint_param_1.output_zero = 0;// 根据实际安装调整零位
   joint_param_1.ratio = 6.33f;
   joint_param_1.dir = -1;
 
   joint_param_2.rotor_zero = 0.0f;// 根据实际转子调整零位
-  joint_param_2.output_zero = PI;// 根据实际安装调整零位
+  joint_param_2.output_zero = -2.63684;// 根据实际安装调整零位
+  // joint_param_2.output_zero = PI;// 根据实际安装调整零位
   joint_param_2.ratio = 6.33f;
   joint_param_2.dir = -1;
 
   joint_param_3.rotor_zero = 0.0f;// 根据实际转子调整零位
-  joint_param_3.output_zero = PI;// 根据实际安装调整零位
+  joint_param_3.output_zero = -0.46094;// 根据实际安装调整零位
+  // joint_param_3.output_zero = PI;// 根据实际安装调整零位
   joint_param_3.ratio = 6.33f;
   joint_param_3.dir = -1;
 
   joint_param_4.rotor_zero = 0.0f;// 根据实际转子调整零位
-  joint_param_4.output_zero = PI;// 根据实际安装调整零位
+  joint_param_4.output_zero = -0.38362;// 根据实际安装调整零位
+  // joint_param_4.output_zero = PI;// 根据实际安装调整零位
   joint_param_4.ratio = 6.33f;
   joint_param_4.dir = -1;
 
   joint_param_5.rotor_zero = 0.0f;// 根据实际转子调整零位
-  joint_param_5.output_zero = PI;// 根据实际安装调整零位
+  joint_param_5.output_zero = -2.87717;// 根据实际安装调整零位
+  // joint_param_5.output_zero = PI;// 根据实际安装调整零位
   joint_param_5.ratio = 6.33f;
   joint_param_5.dir = -1;
 
   joint_param_6.rotor_zero = 0.0f;// 根据实际转子调整零位
-  joint_param_6.output_zero = 0;// 根据实际安装调整零位
+  joint_param_6.output_zero = -0.38362;// 根据实际安装调整零位
+  // joint_param_6.output_zero = 0;// 根据实际安装调整零位
   joint_param_6.ratio = 6.33f;
   joint_param_6.dir = -1;
 
   joint_param_7.rotor_zero = 0.0f;// 根据实际转子调整零位
-  joint_param_7.output_zero = 0;// 根据实际安装调整零位
+  joint_param_7.output_zero = -2.87717;// 根据实际安装调整零位
+  // joint_param_7.output_zero = 0;// 根据实际安装调整零位
   joint_param_7.ratio = 6.33f;
   joint_param_7.dir = -1;
 
@@ -183,7 +199,7 @@ int main(void)
 
   RS485_SetRxTimeout(&rs485, 10U);
   RS485_SetMotorMask(&rs485, RS485_ALL_MOTOR_MASK); // 改这里可选择本次参与读写的电机
-  // RS485_SetMotorMask(&rs485, (1U << 0) | (1U << 1)| (1U << 4)| (1U << 5)); // 只读写电机0和1
+  // RS485_SetMotorMask(&rs485, (1U << 0) | (1U << 1)); // 只读写电机0和1
 
   //RS485_1
   cmd_0.id = 0;     cmd_1.id = 1;     cmd_2.id = 2;    cmd_3.id = 3;
@@ -236,19 +252,66 @@ int main(void)
     if(Key[8] == 1792) start_1 = 1; else start_1 = 0;//左上长按键
     if(Key[4] == 1792) Enable = 1; else Enable = 0;//左按键
     if(Key[5] == 191) mode = 1; else if(Key[5] == 997) mode = 2; else if(Key[5] == 1792) mode = 3;//左拨键
+    if(Key[9]<800) stand_state = 0; else if(Key[9]<1300 && Key[9]>=800) stand_state = 1; else stand_state = 2;//右上长按键
+    // if(Key[6] == 191) stand = 0; else if(Key[5] == 997) stand = 1; else if(Key[5] == 1792) mode = 3;//右拨键
     cnt++;
+    
+    output_now_0 = rotor_to_output(data_0.Pos, &joint_param_0);
+    // output_now_0 *= 180.0f/PI;
+    output_now_1 = rotor_to_output(data_1.Pos, &joint_param_1);
+    theta1_need = output_now_1;
+    // if(theta1_out>0) output_now_0= (PI-theta1_out); 
+    if(output_now_0<PI)  
+    {
+        theta2_need = PI-output_now_0;
+    }
+    else 
+    {
+        theta2_need = -PI-output_now_0;
+    }
+    // if(theta1_out<0) output_now_0 = -(PI+theta1_out);
+
+    // fivebar_forward(theta1_need, theta2_need, &need_P, true);
+
+    // output_now_1 *= 180.0f/PI;
+    // output_now_2 = rotor_to_output(data_2.Pos, &joint_param_2);
+    // output_now_2 *= 180.0f/PI;
+    // output_now_3 = rotor_to_output(data_3.Pos, &joint_param_3);
+    // output_now_3 *= 180.0f/PI;
+    // output_now_4 = rotor_to_output(data_4.Pos, &joint_param_4);
+    // output_now_4 *= 180.0f/PI;
+    // output_now_5 = rotor_to_output(data_5.Pos, &joint_param_5);
+    // output_now_5 *= 180.0f/PI;
+    // output_now_6 = rotor_to_output(data_6.Pos, &joint_param_6);
+    // output_now_6 *= 180.0f/PI;
+    // output_now_7 = rotor_to_output(data_7.Pos, &joint_param_7);
+    // output_now_7 *= 180.0f/PI;
     if(Enable)
     {
         if(flag_1 == 1)
         {
-          PosPID_Init(&Pospid[0], 0.24f, 0.0f, 0.004f, 0, 0.001f);  
-          PosPID_Init(&Pospid[1], 0.24f, 0.0f, 0.004f, 0, 0.001f);
-          PosPID_Init(&Pospid[2], 0.24f, 0.0f, 0.004f, 0, 0.001f);
-          PosPID_Init(&Pospid[3], 0.24f, 0.0f, 0.004f, 0, 0.001f);
-          PosPID_Init(&Pospid[4], 0.24f, 0.0f, 0.004f, 0, 0.001f);
-          PosPID_Init(&Pospid[5], 0.24f, 0.0f, 0.004f, 0, 0.001f);
-          PosPID_Init(&Pospid[6], 0.24f, 0.0f, 0.004f, 0, 0.001f);
-          PosPID_Init(&Pospid[7], 0.24f, 0.0f, 0.004f, 0, 0.001f);
+          if(mode == 3)
+          {
+            PosPID_Init(&Pospid[0], 0.25f, 0.0f, 0.004f, 0, 0.003f);  
+            PosPID_Init(&Pospid[1], 0.25f, 0.0f, 0.004f, 0, 0.003f);
+            PosPID_Init(&Pospid[2], 0.25f, 0.0f, 0.004f, 0, 0.003f);
+            PosPID_Init(&Pospid[3], 0.25f, 0.0f, 0.004f, 0, 0.003f);
+            PosPID_Init(&Pospid[4], 0.25f, 0.0f, 0.004f, 0, 0.003f);
+            PosPID_Init(&Pospid[5], 0.25f, 0.0f, 0.004f, 0, 0.003f);
+            PosPID_Init(&Pospid[6], 0.25f, 0.0f, 0.004f, 0, 0.003f);
+            PosPID_Init(&Pospid[7], 0.25f, 0.0f, 0.004f, 0, 0.003f);
+          }
+        }
+        else if(flag_1 == 2) 
+        {
+            PosPID_Init(&Pospid[0], 0.24f, 0.0f, 0.004f, 0, 0.001f);  
+            PosPID_Init(&Pospid[1], 0.24f, 0.0f, 0.004f, 0, 0.001f);
+            PosPID_Init(&Pospid[2], 0.24f, 0.0f, 0.004f, 0, 0.001f);
+            PosPID_Init(&Pospid[3], 0.24f, 0.0f, 0.004f, 0, 0.001f);
+            PosPID_Init(&Pospid[4], 0.24f, 0.0f, 0.004f, 0, 0.001f);
+            PosPID_Init(&Pospid[5], 0.24f, 0.0f, 0.004f, 0, 0.001f);
+            PosPID_Init(&Pospid[6], 0.24f, 0.0f, 0.004f, 0, 0.001f);
+            PosPID_Init(&Pospid[7], 0.24f, 0.0f, 0.004f, 0, 0.001f);
         }
     }
     else
@@ -351,24 +414,73 @@ void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim)
                 joint_param_5.rotor_zero = data_5.Pos;
                 joint_param_6.rotor_zero = data_6.Pos;
                 joint_param_7.rotor_zero = data_7.Pos;
+
                 time = 0.0f;
                 flag_1 = 1;
+                count = 0;
             }
         }
         if(flag_1 == 1)
+        {
+            if(mode == 3)
+            {
+                cmd_0.Pos = output_to_rotor(0, &joint_param_0); PosPID_UpdateCmd(&cmd_0, 0, &Pospid[0]);
+                cmd_1.Pos = output_to_rotor_stand(-2*PI, &joint_param_1); PosPID_UpdateCmd(&cmd_1, -2*PI, &Pospid[1]);
+                cmd_2.Pos = output_to_rotor(PI, &joint_param_2); PosPID_UpdateCmd(&cmd_2, PI, &Pospid[2]);
+                cmd_3.Pos = output_to_rotor_stand(PI, &joint_param_3); PosPID_UpdateCmd(&cmd_3, PI, &Pospid[3]);
+                cmd_4.Pos = output_to_rotor_stand(PI, &joint_param_4); PosPID_UpdateCmd(&cmd_4, PI, &Pospid[4]);
+                cmd_5.Pos = output_to_rotor(PI, &joint_param_5); PosPID_UpdateCmd(&cmd_5, PI, &Pospid[5]);
+                cmd_6.Pos = output_to_rotor(0, &joint_param_6); PosPID_UpdateCmd(&cmd_6, -2*PI, &Pospid[6]);
+                cmd_7.Pos = output_to_rotor_stand(-2*PI, &joint_param_7); PosPID_UpdateCmd(&cmd_7, 0, &Pospid[7]);                                        
+            }
+        }
+        if((start_1 == 1)&&(flag_1==1))
+        {
+            if(count < 1000)count++;
+            if(count>= 1000)
+            {
+                joint_param_0.rotor_zero = data_0.Pos;
+                joint_param_1.rotor_zero = data_1.Pos;
+                joint_param_2.rotor_zero = data_2.Pos;
+                joint_param_3.rotor_zero = data_3.Pos;
+                joint_param_4.rotor_zero = data_4.Pos;
+                joint_param_5.rotor_zero = data_5.Pos;
+                joint_param_6.rotor_zero = data_6.Pos;
+                joint_param_7.rotor_zero = data_7.Pos;
+                joint_param_0.output_zero = 0;// 根据实际安装调整零位
+                joint_param_1.output_zero = 0;// 根据实际安装调整零位
+                joint_param_2.output_zero = PI;// 根据实际安装调整零位
+                joint_param_3.output_zero = PI;// 根据实际安装调整零位
+                joint_param_4.output_zero = PI;// 根据实际安装调整零位
+                joint_param_5.output_zero = PI;// 根据实际安装调整零位
+                joint_param_6.output_zero = 0;// 根据实际安装调整零位
+                joint_param_7.output_zero = 0;// 根据实际安装调整零位
+                time = 0.0f;
+                flag_1 = 2;
+            }
+        }
+        if(flag_1 == 2)
         {
             if((run == 1))
             {
                 if(mode == 1)
                 {
-                  cmd_0.Pos = joint_param_0.rotor_zero; PosPID_UpdateCmd(&cmd_0, cmd_0.Pos, &Pospid[0]);
-                  cmd_1.Pos = joint_param_1.rotor_zero; PosPID_UpdateCmd(&cmd_1, cmd_1.Pos, &Pospid[1]);
-                  cmd_2.Pos = joint_param_2.rotor_zero; PosPID_UpdateCmd(&cmd_2, cmd_2.Pos, &Pospid[2]);
-                  cmd_3.Pos = joint_param_3.rotor_zero; PosPID_UpdateCmd(&cmd_3, cmd_3.Pos, &Pospid[3]);
-                  cmd_4.Pos = joint_param_4.rotor_zero; PosPID_UpdateCmd(&cmd_4, cmd_4.Pos, &Pospid[4]);
-                  cmd_5.Pos = joint_param_5.rotor_zero; PosPID_UpdateCmd(&cmd_5, cmd_5.Pos, &Pospid[5]);
-                  cmd_6.Pos = joint_param_6.rotor_zero; PosPID_UpdateCmd(&cmd_6, cmd_6.Pos, &Pospid[6]);
-                  cmd_7.Pos = joint_param_7.rotor_zero; PosPID_UpdateCmd(&cmd_7, cmd_7.Pos, &Pospid[7]);
+                  // cmd_0.Pos = joint_param_0.rotor_zero; PosPID_UpdateCmd(&cmd_0, cmd_0.Pos, &Pospid[0]);
+                  // cmd_1.Pos = joint_param_1.rotor_zero; PosPID_UpdateCmd(&cmd_1, cmd_1.Pos, &Pospid[1]);
+                  // cmd_2.Pos = joint_param_2.rotor_zero; PosPID_UpdateCmd(&cmd_2, cmd_2.Pos, &Pospid[2]);
+                  // cmd_3.Pos = joint_param_3.rotor_zero; PosPID_UpdateCmd(&cmd_3, cmd_3.Pos, &Pospid[3]);
+                  // cmd_4.Pos = joint_param_4.rotor_zero; PosPID_UpdateCmd(&cmd_4, cmd_4.Pos, &Pospid[4]);
+                  // cmd_5.Pos = joint_param_5.rotor_zero; PosPID_UpdateCmd(&cmd_5, cmd_5.Pos, &Pospid[5]);
+                  // cmd_6.Pos = joint_param_6.rotor_zero; PosPID_UpdateCmd(&cmd_6, cmd_6.Pos, &Pospid[6]);
+                  // cmd_7.Pos = joint_param_7.rotor_zero; PosPID_UpdateCmd(&cmd_7, cmd_7.Pos, &Pospid[7]);
+                  cmd_0.Pos = output_to_rotor(0, &joint_param_0); PosPID_UpdateCmd(&cmd_0, 0, &Pospid[0]);
+                  cmd_1.Pos = output_to_rotor(0, &joint_param_1); PosPID_UpdateCmd(&cmd_1, -2*PI, &Pospid[1]);
+                  cmd_2.Pos = output_to_rotor(PI, &joint_param_2); PosPID_UpdateCmd(&cmd_2, PI, &Pospid[2]);
+                  cmd_3.Pos = output_to_rotor(PI, &joint_param_3); PosPID_UpdateCmd(&cmd_3, PI, &Pospid[3]);
+                  cmd_4.Pos = output_to_rotor(PI, &joint_param_4); PosPID_UpdateCmd(&cmd_4, PI, &Pospid[4]);
+                  cmd_5.Pos = output_to_rotor(PI, &joint_param_5); PosPID_UpdateCmd(&cmd_5, PI, &Pospid[5]);
+                  cmd_6.Pos = output_to_rotor(0, &joint_param_6); PosPID_UpdateCmd(&cmd_6, -2*PI, &Pospid[6]);
+                  cmd_7.Pos = output_to_rotor(0, &joint_param_7); PosPID_UpdateCmd(&cmd_7, 0, &Pospid[7]);
                   time = 0.0f;
                 }
                 if(mode == 2)
@@ -409,8 +521,7 @@ void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim)
                         if(theta1_out>0) go_0_pos= (PI-theta1_out);
                         if(theta1_out<0) go_0_pos = -(PI+theta1_out);
                         go_1_pos = theta0_out;
-                        go_4_pos = theta1_out;
-                        output_now_4 = go_4_pos * 180.0f/PI;                     
+                        go_4_pos = theta1_out;                   
                         go_5_pos = (PI-theta0_out); 
             
                         cmd_0.Pos = output_to_rotor(go_0_pos, &joint_param_0); PosPID_UpdateCmd(&cmd_0, go_0_pos, &Pospid[0]);//正向                        
@@ -451,8 +562,7 @@ void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim)
                         if(theta1_out>0) go_0_pos= (PI-theta1_out);
                         if(theta1_out<0) go_0_pos = -(PI+theta1_out);
                         go_1_pos = theta0_out;
-                        go_4_pos = theta1_out;
-                        output_now_4 = go_4_pos * 180.0f/PI;                     
+                        go_4_pos = theta1_out;                
                         go_5_pos = (PI-theta0_out); 
                         // cmd_0.Pos = output_to_rotor(theta0_out, &joint_param_0); PosPID_UpdateCmd(&cmd_0, theta0_out, &Pospid[0]);//反向
                         cmd_0.Pos = output_to_rotor(go_0_pos, &joint_param_0); PosPID_UpdateCmd(&cmd_0, (PI-theta1_out), &Pospid[0]);//正向
@@ -489,13 +599,7 @@ void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim)
                       }                         
                     }             
                 }
-                if(mode == 3)
-                {
-                  output_now_0 = rotor_to_output(data_0.Pos, &joint_param_0);
-                  output_now_0 *= 180.0f/PI;
-                  output_now_1 = rotor_to_output(data_1.Pos, &joint_param_1);
-                  output_now_1 *= 180.0f/PI;                                     
-                }
+
             }
             else if (run == 0) 
             {

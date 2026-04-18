@@ -31,4 +31,6 @@ void foot_ellipse_trajectory(float time,FootTrajParam *param,float *x,float *y);
 float output_to_rotor(float theta_out, JointParam *param);
 float rotor_to_output(float rotor_now, JointParam *param);
 void wrap_pi_fast(float *angle);
+float output_to_rotor_stand(float theta_out, JointParam *param);
+
 #endif // MOTION_H

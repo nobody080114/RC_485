@@ -197,6 +197,18 @@ bool fivebar_inverse(float x, float y,
  *
  * @return 转子目标角 (rad)
  */
+float output_to_rotor_stand(float theta_out, JointParam *param)
+{
+    // if(theta_out-param->output_zero > PI)
+    // return ((theta_out-param->output_zero-TWO_PI) * param->ratio) / param->dir
+    //     + param->rotor_zero;
+    // else if(theta_out-param->output_zero < -PI)
+    // return ((theta_out-param->output_zero+TWO_PI) * param->ratio) / param->dir
+    //     + param->rotor_zero;
+    // else
+    return ((theta_out-param->output_zero) * param->ratio) / param->dir
+        + param->rotor_zero;
+}
 float output_to_rotor(float theta_out, JointParam *param)
 {
     if(theta_out-param->output_zero > PI)
@@ -227,6 +239,8 @@ float rotor_to_output(float rotor_now, JointParam *param)
     {
         return ((rotor_now-param->rotor_zero) * param->dir) / param->ratio
                + param->output_zero;
+        // wrap_pi_fast(&angle);
+        // return angle;
     }
     else
     {
