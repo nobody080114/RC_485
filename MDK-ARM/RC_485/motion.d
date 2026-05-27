@@ -1,9 +1,5 @@
-rc_485/motion.o: ..\My_code\motion.c \
-  D:\Program\ Files\ (x86)\Keil5\ARM\ARMCLANG\include\math.h \
-  D:\Program\ Files\ (x86)\Keil5\ARM\ARMCLANG\include\stdbool.h \
-  D:\Program\ Files\ (x86)\Keil5\ARM\ARMCLANG\include\stdio.h \
-  ..\My_code\motion.h \
-  ..\Drivers\STM32H7xx_HAL_Driver\Inc\stm32h7xx_hal.h \
+rc_485/motion.o: ..\My_code\motion.c ..\My_code\motion.h \
+  ..\Core\Inc\main.h ..\Drivers\STM32H7xx_HAL_Driver\Inc\stm32h7xx_hal.h \
   ..\Core\Inc\stm32h7xx_hal_conf.h \
   ..\Drivers\STM32H7xx_HAL_Driver\Inc\stm32h7xx_hal_rcc.h \
   ..\Drivers\STM32H7xx_HAL_Driver\Inc\stm32h7xx_hal_def.h \
@@ -20,6 +16,7 @@ rc_485/motion.o: ..\My_code\motion.c \
   ..\Drivers\CMSIS\Device\ST\STM32H7xx\Include\system_stm32h7xx.h \
   ..\Drivers\STM32H7xx_HAL_Driver\Inc\Legacy\stm32_hal_legacy.h \
   D:\Program\ Files\ (x86)\Keil5\ARM\ARMCLANG\include\stddef.h \
+  D:\Program\ Files\ (x86)\Keil5\ARM\ARMCLANG\include\math.h \
   ..\Drivers\STM32H7xx_HAL_Driver\Inc\stm32h7xx_hal_rcc_ex.h \
   ..\Drivers\STM32H7xx_HAL_Driver\Inc\stm32h7xx_hal_gpio.h \
   ..\Drivers\STM32H7xx_HAL_Driver\Inc\stm32h7xx_hal_gpio_ex.h \
@@ -39,7 +36,14 @@ rc_485/motion.o: ..\My_code\motion.c \
   ..\Drivers\STM32H7xx_HAL_Driver\Inc\stm32h7xx_hal_tim_ex.h \
   ..\Drivers\STM32H7xx_HAL_Driver\Inc\stm32h7xx_hal_uart.h \
   ..\Drivers\STM32H7xx_HAL_Driver\Inc\stm32h7xx_hal_uart_ex.h \
+  ..\Core\Inc\dma.h ..\Core\Inc\tim.h ..\Core\Inc\usart.h \
+  ..\Core\Inc\gpio.h ..\Unitree\gom_protocol.h ..\Unitree\control.h \
+  D:\Program\ Files\ (x86)\Keil5\ARM\ARMCLANG\include\string.h \
+  D:\Program\ Files\ (x86)\Keil5\ARM\ARMCLANG\include\stdio.h \
+  ..\My_code\my_system.h ..\My_code\pid.h ..\My_code\CRSF.h \
   ..\Drivers\CMSIS\DSP\Include\arm_math.h \
   ..\Drivers\CMSIS\Include\cmsis_compiler.h \
-  D:\Program\ Files\ (x86)\Keil5\ARM\ARMCLANG\include\string.h \
-  D:\Program\ Files\ (x86)\Keil5\ARM\ARMCLANG\include\float.h
+  D:\Program\ Files\ (x86)\Keil5\ARM\ARMCLANG\include\float.h \
+  D:\Program\ Files\ (x86)\Keil5\ARM\ARMCLANG\include\stdlib.h \
+  D:\Program\ Files\ (x86)\Keil5\ARM\ARMCLANG\include\stdbool.h \
+  ..\Unitree\crc_ccitt.h

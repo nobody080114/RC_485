@@ -33,6 +33,7 @@
 "rc_485\my_system.o"
 "rc_485\note.o"
 "rc_485\pid.o"
+"rc_485\crsf.o"
 "rc_485\control.o"
 "rc_485\crc_ccitt.o"
 "rc_485\gom_protocol.o"

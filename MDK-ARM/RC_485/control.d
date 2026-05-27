@@ -1,4 +1,4 @@
-rc_485/control.o: ..\Unitree\control.c ..\Unitree\control.h \
+rc_485/control.o: ..\Unitree\control.c ..\Core\Inc\main.h \
   ..\Drivers\STM32H7xx_HAL_Driver\Inc\stm32h7xx_hal.h \
   ..\Core\Inc\stm32h7xx_hal_conf.h \
   ..\Drivers\STM32H7xx_HAL_Driver\Inc\stm32h7xx_hal_rcc.h \
@@ -36,8 +36,15 @@ rc_485/control.o: ..\Unitree\control.c ..\Unitree\control.h \
   ..\Drivers\STM32H7xx_HAL_Driver\Inc\stm32h7xx_hal_tim_ex.h \
   ..\Drivers\STM32H7xx_HAL_Driver\Inc\stm32h7xx_hal_uart.h \
   ..\Drivers\STM32H7xx_HAL_Driver\Inc\stm32h7xx_hal_uart_ex.h \
-  ..\Unitree\gom_protocol.h ..\Unitree\crc_ccitt.h \
-  D:\Program\ Files\ (x86)\Keil5\ARM\ARMCLANG\include\stdlib.h \
-  D:\Program\ Files\ (x86)\Keil5\ARM\ARMCLANG\include\string.h \
+  ..\Core\Inc\dma.h ..\Core\Inc\tim.h ..\Core\Inc\usart.h \
+  ..\Core\Inc\gpio.h ..\Unitree\gom_protocol.h ..\Unitree\control.h \
   ..\My_code\motion.h \
-  D:\Program\ Files\ (x86)\Keil5\ARM\ARMCLANG\include\stdbool.h
+  D:\Program\ Files\ (x86)\Keil5\ARM\ARMCLANG\include\stdbool.h \
+  D:\Program\ Files\ (x86)\Keil5\ARM\ARMCLANG\include\string.h \
+  D:\Program\ Files\ (x86)\Keil5\ARM\ARMCLANG\include\stdio.h \
+  ..\My_code\my_system.h ..\My_code\pid.h ..\My_code\CRSF.h \
+  ..\Drivers\CMSIS\DSP\Include\arm_math.h \
+  ..\Drivers\CMSIS\Include\cmsis_compiler.h \
+  D:\Program\ Files\ (x86)\Keil5\ARM\ARMCLANG\include\float.h \
+  D:\Program\ Files\ (x86)\Keil5\ARM\ARMCLANG\include\stdlib.h \
+  ..\Unitree\crc_ccitt.h

@@ -604,6 +604,16 @@
               <FileType>5</FileType>
               <FilePath>..\My_code\pid.h</FilePath>
             </File>
+            <File>
+              <FileName>CRSF.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>..\My_code\CRSF.c</FilePath>
+            </File>
+            <File>
+              <FileName>CRSF.h</FileName>
+              <FileType>5</FileType>
+              <FilePath>..\My_code\CRSF.h</FilePath>
+            </File>
           </Files>
         </Group>
         <Group>
