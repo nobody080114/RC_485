@@ -1,12 +1,9 @@
-#include "main.h"
 #include "control.h"
-#include "gom_protocol.h"
+
 MotorCmd_t  cmd_0 = {0}, cmd_1 = {0}, cmd_2 = {0}, cmd_3 = {0},
             cmd_4 = {0}, cmd_5 = {0}, cmd_6 = {0}, cmd_7 = {0};
 MotorData_t data_0 = {0}, data_1 = {0}, data_2 = {0}, data_3 = {0},
             data_4 = {0}, data_5 = {0}, data_6 = {0}, data_7 = {0};
-extern uint8_t start;
-extern JointParam joint_param_0, joint_param_1;
 /*
  * DMA 缓冲区 - 必须位于 RAM_D2 (0x30000000)，DMA1 可访问
  * UART2(ch1): 电机 0~3；UART3(ch2): 电机 4~7
@@ -197,12 +194,6 @@ void RS485_RxCpltHandler(RS485_Scheduler_t *sch, UART_HandleTypeDef *huart, uint
     uint8_t *rx_buf = (idx < UART2_MOTOR_COUNT) ? dma_rx_buf_ch1 : dma_rx_buf_ch2;
     memcpy(&data_list[idx]->motor_recv_data, rx_buf, sizeof(RIS_MotorData_t));
     extract_data(data_list[idx]);
-    // if(start == 0)
-    // {
-    //     joint_param_0.rotor_zero = data_0.Pos;
-    //     joint_param_1.rotor_zero = data_1.Pos;
-    //     start = 1;
-    // }  
     sch->waiting_rx = 0;
     move_to_next_enabled_motor(sch);
     sch->rx_ready = 1;

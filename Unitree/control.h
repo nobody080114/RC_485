@@ -1,8 +1,7 @@
 #ifndef __CONTROL_H
 #define __CONTROL_H
 
-#include <stdint.h>
-#include "gom_protocol.h"
+#include "main.h"
 
 /* Forward declaration is enough because this header only stores UART handle pointers. */
 typedef struct __UART_HandleTypeDef UART_HandleTypeDef;

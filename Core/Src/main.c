@@ -18,10 +18,12 @@
 /* USER CODE END Header */
 /* Includes ------------------------------------------------------------------*/
 #include "main.h"
+#include "control.h"
 #include "dma.h"
 #include "tim.h"
 #include "usart.h"
 #include "gpio.h"
+#include <stdint.h>
 
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
@@ -46,24 +48,67 @@
 /* Private variables ---------------------------------------------------------*/
 
 /* USER CODE BEGIN PV */
-
+// 速度低通滤波器参数 (截止频率约 30~50Hz)
+// alpha 越小滤波越强，但延迟越大；alpha 越大越灵敏，但噪声越大。
+#define VEL_ALPHA 0.2f 
 RS485_Scheduler_t rs485;
 FootTrajParam traj_param;
-Point2D P,need_P;
+Point2D P,current_P;
 JointParam joint_param_0, joint_param_1, joint_param_2, joint_param_3, joint_param_4, joint_param_5, joint_param_6, joint_param_7;
 PosPID_t Pospid[8];
-float time = 0.0f;
-float dt = 0.001f;
+float time = 0.0f,F_time = 0.0f,R_time = 0.0f,dt = 0.001f;
 float theta0_out = 0, theta1_out = 0;
 float go_0_pos=0,go_1_pos=0,go_2_pos=0,go_3_pos=0,go_4_pos=0,go_5_pos=0,go_6_pos=0,go_7_pos=0;
-int8_t start = 0,start_1 = 0,run  = 0,flag_1 = 1,mode = 0,Enable = 0,go_dir = 0,stand_state = 0;
+int8_t start = 0,start_1 = 0,run  = 0,flag_1 = 1,mode = 0,control_mode = 0,Enable = 0,go_dir = 0,stand_state = 0;
 //go_dir: 1-前进，2-后退，3-左移，4-右移
 uint16_t speed = 0,speed_state = 0;//speed_state: 0-停止，1-低速，2-中速，3-高速
-float rotor_now_0, rotor_now_1,theta1_need, theta2_need;
-float output_now_0, output_now_1,output_now_2, output_now_3, output_now_4, output_now_5, output_now_6, output_now_7;
 uint32_t zhen = 0,cnt = 0;
 uint16_t Key[10];
 uint16_t cnt_tx = 0;
+Filter2ndState filter_w1 = {0};
+Filter2ndState filter_w2 = {0};
+
+Foot_motion foot_motion_0 = {
+ .Kp_x = 400, // X方向的比例增益 (N/m)
+ .Kd_xt = 25,  // X轴前馈阻尼系数 (N·s/m)
+ .Kd_xr = 20,  // X轴反馈阻尼系数 (N·s/m)
+ .Kp_y = 1000,// Y方向的比例增益 (N/m)
+ .Kd_yt = 115,  // Y轴前馈阻尼系数 (N·s/m)
+ .Kd_yr = 87,  // Y轴反馈阻尼系数 (N·s/m)
+ .G_0 = 3.2f, // 单腿重力补偿增益
+ .G_1 = 0.0f // 单腿重力补偿增益
+};
+
+Foot_motion foot_motion_1 = {
+ .Kp_x = 400, // X方向的比例增益 (N/m)
+ .Kd_xt = 25,  // X轴前馈阻尼系数 (N·s/m)
+ .Kd_xr = 20,  // X轴反馈阻尼系数 (N·s/m)
+ .Kp_y = 1000,// Y方向的比例增益 (N/m)
+ .Kd_yt = 115,  // Y轴前馈阻尼系数 (N·s/m)
+ .Kd_yr = 87,  // Y轴反馈阻尼系数 (N·s/m)
+ .G_0 = 3.2f, // 单腿重力补偿增益
+ .G_1 = 0.0f // 单腿重力补偿增益
+};
+Foot_motion foot_motion_2 = {
+ .Kp_x = 400, // X方向的比例增益 (N/m)
+ .Kd_xt = 25,  // X轴前馈阻尼系数 (N·s/m)
+ .Kd_xr = 20,  // X轴反馈阻尼系数 (N·s/m)
+ .Kp_y = 1000,// Y方向的比例增益 (N/m)
+ .Kd_yt = 115,  // Y轴前馈阻尼系数 (N·s/m)
+ .Kd_yr = 87,  // Y轴反馈阻尼系数 (N·s/m)
+ .G_0 = 3.2f, // 单腿重力补偿增益
+ .G_1 = 0.0f // 单腿重力补偿增益
+};
+Foot_motion foot_motion_3 = {
+ .Kp_x = 400, // X方向的比例增益 (N/m)
+ .Kd_xt = 25,  // X轴前馈阻尼系数 (N·s/m)
+ .Kd_xr = 20,  // X轴反馈阻尼系数 (N·s/m)
+ .Kp_y = 1000,// Y方向的比例增益 (N/m)
+ .Kd_yt = 115,  // Y轴前馈阻尼系数 (N·s/m)
+ .Kd_yr = 87,  // Y轴反馈阻尼系数 (N·s/m)
+ .G_0 = 3.2f, // 单腿重力补偿增益
+  .G_1 = 0.0f // 单腿重力补偿增益
+};
 /* USER CODE END PV */
 
 /* Private function prototypes -----------------------------------------------*/
@@ -136,57 +181,57 @@ int main(void)
 
   joint_param_0.rotor_zero = 0;// 根据实际安装调整零位
   // joint_param_0.output_zero = -0.46094;// 根据实际安装调整零位
-  joint_param_0.output_zero = 0;// 根据实际安装调整零位
+  joint_param_0.output_zero = -2.622;// 根据实际安装调整零位
   joint_param_0.ratio = 6.33f;
-  joint_param_0.dir = -1;
+  joint_param_0.dir = 1;
 
   joint_param_1.rotor_zero = 0.0f;// 根据实际安装调整零位
   // joint_param_1.output_zero = -2.68065;// 根据实际安装调整零位
-  joint_param_1.output_zero = 0;// 根据实际安装调整零位
+  joint_param_1.output_zero = -0.54070;// 根据实际安装调整零位
   joint_param_1.ratio = 6.33f;
   joint_param_1.dir = -1;
 
   joint_param_2.rotor_zero = 0.0f;// 根据实际转子调整零位
   // joint_param_2.output_zero = -2.63684;// 根据实际安装调整零位
-  joint_param_2.output_zero = PI;// 根据实际安装调整零位
+  joint_param_2.output_zero = -2.622;// 根据实际安装调整零位
   joint_param_2.ratio = 6.33f;
   joint_param_2.dir = -1;
 
   joint_param_3.rotor_zero = 0.0f;// 根据实际转子调整零位
   // joint_param_3.output_zero = -0.46094;// 根据实际安装调整零位
-  joint_param_3.output_zero = PI;// 根据实际安装调整零位
+  joint_param_3.output_zero = -0.54070;// 根据实际安装调整零位
   joint_param_3.ratio = 6.33f;
-  joint_param_3.dir = -1;
+  joint_param_3.dir = 1;
 
   joint_param_4.rotor_zero = 0.0f;// 根据实际转子调整零位
   // joint_param_4.output_zero = -0.38362;// 根据实际安装调整零位
-  joint_param_4.output_zero = PI;// 根据实际安装调整零位
+  joint_param_4.output_zero = -2.622;// 根据实际安装调整零位
   joint_param_4.ratio = 6.33f;
   joint_param_4.dir = -1;
 
   joint_param_5.rotor_zero = 0.0f;// 根据实际转子调整零位
   // joint_param_5.output_zero = -2.87717;// 根据实际安装调整零位
-  joint_param_5.output_zero = PI;// 根据实际安装调整零位
+  joint_param_5.output_zero = -0.54070;// 根据实际安装调整零位
   joint_param_5.ratio = 6.33f;
-  joint_param_5.dir = -1;
+  joint_param_5.dir = 1;
 
   joint_param_6.rotor_zero = 0.0f;// 根据实际转子调整零位
   // joint_param_6.output_zero = -0.38362;// 根据实际安装调整零位
-  joint_param_6.output_zero = 0;// 根据实际安装调整零位
+  joint_param_6.output_zero = -0.54070;// 根据实际安装调整零位
   joint_param_6.ratio = 6.33f;
   joint_param_6.dir = -1;
 
   joint_param_7.rotor_zero = 0.0f;// 根据实际转子调整零位
   // joint_param_7.output_zero = -2.87717;// 根据实际安装调整零位
-  joint_param_7.output_zero = 0;// 根据实际安装调整零位
+  joint_param_7.output_zero = -2.622;// 根据实际安装调整零位
   joint_param_7.ratio = 6.33f;
-  joint_param_7.dir = -1;
+  joint_param_7.dir = 1;
 
-  traj_param.step_length  = 60.0f;
-  traj_param.step_height  = 25.0f;
-  traj_param.stand_height = -150.0f;
+  traj_param.step_length  = 0.060f;
+  traj_param.step_height  = 0.025f;
+  traj_param.stand_height = -0.150f;
   // traj_param.period       = 0.6f;
-  traj_param.period       = 0.1f;
+  traj_param.period       = 1.0f;
 
   rs485.current_motor = 0;
   rs485.tx_busy = 0;
@@ -249,76 +294,81 @@ int main(void)
     if(Key[4] == 1792) Enable = 1; else Enable = 0;//左按键
     if(Key[5] == 191) mode = 1; else if(Key[5] == 997) mode = 2; else if(Key[5] == 1792) mode = 3;//左拨键
     // if(Key[9]<800) stand_state = 0; else if(Key[9]<1300 && Key[9]>=800) stand_state = 1; else stand_state = 2;//右上长按键
-    // if(Key[6] == 191) stand = 0; else if(Key[5] == 997) stand = 1; else if(Key[5] == 1792) mode = 3;//右拨键
+    if(Key[6] == 191) control_mode = 0; else if(Key[5] == 997) control_mode = 1; else if(Key[5] == 1792) control_mode = 2;//右拨键 //0-位控，1-力控，2-混合控制
 
-    // output_now_1 *= 180.0f/PI;
-    // output_now_2 = rotor_to_output(data_2.Pos, &joint_param_2);
-    // output_now_2 *= 180.0f/PI;
-    // output_now_3 = rotor_to_output(data_3.Pos, &joint_param_3);
-    // output_now_3 *= 180.0f/PI;
-    // output_now_4 = rotor_to_output(data_4.Pos, &joint_param_4);
-    // output_now_4 *= 180.0f/PI;
-    // output_now_5 = rotor_to_output(data_5.Pos, &joint_param_5);
-    // output_now_5 *= 180.0f/PI;
-    // output_now_6 = rotor_to_output(data_6.Pos, &joint_param_6);
-    // output_now_6 *= 180.0f/PI;
-    // output_now_7 = rotor_to_output(data_7.Pos, &joint_param_7);
-    // output_now_7 *= 180.0f/PI;
     if(Enable)
     {
         if(flag_1 == 1)
         {
-          if(mode == 3)
-          {
-            PosPID_Init(&Pospid[0], 0.25f, 0.0f, 0.01f, 0, 0.003f);  
-            PosPID_Init(&Pospid[1], 0.25f, 0.0f, 0.01f, 0, 0.003f);
-            PosPID_Init(&Pospid[2], 0.25f, 0.0f, 0.01f, 0, 0.003f);
-            PosPID_Init(&Pospid[3], 0.25f, 0.0f, 0.01f, 0, 0.003f);
-            PosPID_Init(&Pospid[4], 0.25f, 0.0f, 0.01f, 0, 0.003f);
-            PosPID_Init(&Pospid[5], 0.25f, 0.0f, 0.01f, 0, 0.003f);
-            PosPID_Init(&Pospid[6], 0.25f, 0.0f, 0.01f, 0, 0.003f);
-            PosPID_Init(&Pospid[7], 0.25f, 0.0f, 0.01f, 0, 0.003f);
-          }
+          // if(mode == 3)
+          // {
+          //   PosPID_Init(&Pospid[0], 0.25f, 0.0f, 0.01f, 0, 0.003f);  
+          //   PosPID_Init(&Pospid[1], 0.25f, 0.0f, 0.01f, 0, 0.003f);
+          //   PosPID_Init(&Pospid[2], 0.25f, 0.0f, 0.01f, 0, 0.003f);
+          //   PosPID_Init(&Pospid[3], 0.25f, 0.0f, 0.01f, 0, 0.003f);
+          //   PosPID_Init(&Pospid[4], 0.25f, 0.0f, 0.01f, 0, 0.003f);
+          //   PosPID_Init(&Pospid[5], 0.25f, 0.0f, 0.01f, 0, 0.003f);
+          //   PosPID_Init(&Pospid[6], 0.25f, 0.0f, 0.01f, 0, 0.003f);
+          //   PosPID_Init(&Pospid[7], 0.25f, 0.0f, 0.01f, 0, 0.003f);
+          // }
         }
         else if(flag_1 == 2) 
         {
-            if(speed_state == 3)
+            if(control_mode == 0)
             {
-                PosPID_Init(&Pospid[0], 0.8f, 0.0f, 0.01f, 0, 0.001f);  
-                PosPID_Init(&Pospid[1], 0.8f, 0.0f, 0.01f, 0, 0.001f);
-                PosPID_Init(&Pospid[2], 0.8f, 0.0f, 0.01f, 0, 0.001f);
-                PosPID_Init(&Pospid[3], 0.8f, 0.0f, 0.01f, 0, 0.001f);
-                PosPID_Init(&Pospid[4], 0.8f, 0.0f, 0.01f, 0, 0.001f);
-                PosPID_Init(&Pospid[5], 0.8f, 0.0f, 0.01f, 0, 0.001f);
-                PosPID_Init(&Pospid[6], 0.8f, 0.0f, 0.01f, 0, 0.001f);
-                PosPID_Init(&Pospid[7], 0.8f, 0.0f, 0.01f, 0, 0.001f);
+              cmd_0.T = 0;cmd_1.T = 0;cmd_2.T = 0;cmd_3.T = 0;
+              cmd_4.T = 0;cmd_5.T = 0;cmd_6.T = 0;cmd_7.T = 0;  
+              if(speed_state == 3)
+              {
+                  PosPID_Init(&Pospid[0], 1.0f, 0.0f, 0.01f, 0, 0.001f);  
+                  PosPID_Init(&Pospid[1], 1.0f, 0.0f, 0.01f, 0, 0.001f);
+                  PosPID_Init(&Pospid[2], 1.0f, 0.0f, 0.01f, 0, 0.001f);
+                  PosPID_Init(&Pospid[3], 1.0f, 0.0f, 0.01f, 0, 0.001f);
+                  PosPID_Init(&Pospid[4], 1.0f, 0.0f, 0.01f, 0, 0.001f);
+                  PosPID_Init(&Pospid[5], 1.0f, 0.0f, 0.01f, 0, 0.001f);
+                  PosPID_Init(&Pospid[6], 1.0f, 0.0f, 0.01f, 0, 0.001f);
+                  PosPID_Init(&Pospid[7], 1.0f, 0.0f, 0.01f, 0, 0.001f);
+              }
+              else if(speed_state == 2)
+              {
+                  PosPID_Init(&Pospid[0], 1.0f, 0.0f, 0.01f, 0, 0.002f);  
+                  PosPID_Init(&Pospid[1], 1.0f, 0.0f, 0.01f, 0, 0.002f);
+                  PosPID_Init(&Pospid[2], 1.0f, 0.0f, 0.01f, 0, 0.002f);
+                  PosPID_Init(&Pospid[3], 1.0f, 0.0f, 0.01f, 0, 0.002f);
+                  PosPID_Init(&Pospid[4], 1.0f, 0.0f, 0.01f, 0, 0.002f);
+                  PosPID_Init(&Pospid[5], 1.0f, 0.0f, 0.01f, 0, 0.002f);
+                  PosPID_Init(&Pospid[6], 1.0f, 0.0f, 0.01f, 0, 0.002f);
+                  PosPID_Init(&Pospid[7], 1.0f, 0.0f, 0.01f, 0, 0.002f);
+              }
+              else if(speed_state == 1)
+              {
+                  PosPID_Init(&Pospid[0], 0.6f, 0.0f, 0.01f, 0, 0.003f);  
+                  PosPID_Init(&Pospid[1], 0.6f, 0.0f, 0.01f, 0, 0.003f);
+                  PosPID_Init(&Pospid[2], 0.6f, 0.0f, 0.01f, 0, 0.003f);
+                  PosPID_Init(&Pospid[3], 0.6f, 0.0f, 0.01f, 0, 0.003f);
+                  PosPID_Init(&Pospid[4], 0.6f, 0.0f, 0.01f, 0, 0.003f);
+                  PosPID_Init(&Pospid[5], 0.6f, 0.0f, 0.01f, 0, 0.003f);
+                  PosPID_Init(&Pospid[6], 0.6f, 0.0f, 0.01f, 0, 0.003f);
+                  PosPID_Init(&Pospid[7], 0.6f, 0.0f, 0.01f, 0, 0.003f);
+              }
             }
-            else if(speed_state == 2)
+            else if(control_mode == 1)
             {
-                PosPID_Init(&Pospid[0], 0.5f, 0.0f, 0.01f, 0, 0.002f);  
-                PosPID_Init(&Pospid[1], 0.5f, 0.0f, 0.01f, 0, 0.002f);
-                PosPID_Init(&Pospid[2], 0.5f, 0.0f, 0.01f, 0, 0.002f);
-                PosPID_Init(&Pospid[3], 0.5f, 0.0f, 0.01f, 0, 0.002f);
-                PosPID_Init(&Pospid[4], 0.5f, 0.0f, 0.01f, 0, 0.002f);
-                PosPID_Init(&Pospid[5], 0.5f, 0.0f, 0.01f, 0, 0.002f);
-                PosPID_Init(&Pospid[6], 0.5f, 0.0f, 0.01f, 0, 0.002f);
-                PosPID_Init(&Pospid[7], 0.5f, 0.0f, 0.01f, 0, 0.002f);
-            }
-            else if(speed_state == 1)
-            {
-                PosPID_Init(&Pospid[0], 0.28f, 0.0f, 0.007f, 0, 0.003f);  
-                PosPID_Init(&Pospid[1], 0.28f, 0.0f, 0.007f, 0, 0.003f);
-                PosPID_Init(&Pospid[2], 0.28f, 0.0f, 0.007f, 0, 0.003f);
-                PosPID_Init(&Pospid[3], 0.28f, 0.0f, 0.007f, 0, 0.003f);
-                PosPID_Init(&Pospid[4], 0.28f, 0.0f, 0.007f, 0, 0.003f);
-                PosPID_Init(&Pospid[5], 0.28f, 0.0f, 0.007f, 0, 0.003f);
-                PosPID_Init(&Pospid[6], 0.28f, 0.0f, 0.007f, 0, 0.003f);
-                PosPID_Init(&Pospid[7], 0.28f, 0.0f, 0.007f, 0, 0.003f);
+                PosPID_Init(&Pospid[0], 0.0f, 0.0f, 0.00f, 0, 0.003f);  
+                PosPID_Init(&Pospid[1], 0.0f, 0.0f, 0.00f, 0, 0.003f);
+                PosPID_Init(&Pospid[2], 0.0f, 0.0f, 0.00f, 0, 0.003f);
+                PosPID_Init(&Pospid[3], 0.0f, 0.0f, 0.00f, 0, 0.003f);
+                PosPID_Init(&Pospid[4], 0.0f, 0.0f, 0.00f, 0, 0.003f);
+                PosPID_Init(&Pospid[5], 0.0f, 0.0f, 0.00f, 0, 0.003f);
+                PosPID_Init(&Pospid[6], 0.0f, 0.0f, 0.00f, 0, 0.003f);
+                PosPID_Init(&Pospid[7], 0.0f, 0.0f, 0.00f, 0, 0.003f);
             }
         }
     }
     else
     {
+      cmd_0.T = 0;cmd_1.T = 0;cmd_2.T = 0;cmd_3.T = 0;
+      cmd_4.T = 0;cmd_5.T = 0;cmd_6.T = 0;cmd_7.T = 0;   
       PosPID_Init(&Pospid[0], 0, 0, 0, 0, 0);  
       PosPID_Init(&Pospid[1], 0, 0, 0, 0, 0);
       PosPID_Init(&Pospid[2], 0, 0, 0, 0, 0);
@@ -451,14 +501,14 @@ void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim)
                 joint_param_5.rotor_zero = data_5.Pos;
                 joint_param_6.rotor_zero = data_6.Pos;
                 joint_param_7.rotor_zero = data_7.Pos;
-                joint_param_0.output_zero = 0;// 根据实际安装调整零位
-                joint_param_1.output_zero = 0;// 根据实际安装调整零位
-                joint_param_2.output_zero = PI;// 根据实际安装调整零位
-                joint_param_3.output_zero = PI;// 根据实际安装调整零位
-                joint_param_4.output_zero = PI;// 根据实际安装调整零位
-                joint_param_5.output_zero = PI;// 根据实际安装调整零位
-                joint_param_6.output_zero = 0;// 根据实际安装调整零位
-                joint_param_7.output_zero = 0;// 根据实际安装调整零位
+                joint_param_0.output_zero = -2.622;// 根据实际安装调整零位
+                joint_param_1.output_zero = -0.54070;// 根据实际安装调整零位
+                joint_param_2.output_zero = -2.63684;// 根据实际安装调整零位
+                joint_param_3.output_zero = -0.54070;// 根据实际安装调整零位
+                joint_param_4.output_zero = -2.622;// 根据实际安装调整零位
+                joint_param_5.output_zero = -0.54070;// 根据实际安装调整零位
+                joint_param_6.output_zero = -0.54070;// 根据实际安装调整零位
+                joint_param_7.output_zero = -2.622;// 根据实际安装调整零位
                 time = 0.0f;
                 flag_1 = 2;
             }
@@ -467,31 +517,187 @@ void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim)
         {
             if((run == 1))
             {
-                if(speed>=1100) {traj_param.period = 0.2f;traj_param.step_length  = 60.0f;speed_state = 3;}
-                else if(speed<1100 && speed >= 400) {traj_param.period = 0.25f; traj_param.step_length  = 80.0f;speed_state = 2;}
-                else if(speed<400 && speed >=0) {traj_param.period = 0.3f; traj_param.step_length  = 100.0f; speed_state = 1;}
-                if(mode == 1)
+                if(speed>=1100) {traj_param.period = 0.25f;traj_param.step_length  = 0.080f;speed_state = 3;}
+                else if(speed<1100 && speed >= 400) {traj_param.period = 0.3f; traj_param.step_length  = 0.080f;speed_state = 2;}
+                else if(speed<400 && speed >=0) {traj_param.period = 0.4f; traj_param.step_length  = 0.100f; speed_state = 1;}
+                if(control_mode == 0)
                 {
-                  // cmd_0.Pos = joint_param_0.rotor_zero; PosPID_UpdateCmd(&cmd_0, cmd_0.Pos, &Pospid[0]);
-                  // cmd_1.Pos = joint_param_1.rotor_zero; PosPID_UpdateCmd(&cmd_1, cmd_1.Pos, &Pospid[1]);
-                  // cmd_2.Pos = joint_param_2.rotor_zero; PosPID_UpdateCmd(&cmd_2, cmd_2.Pos, &Pospid[2]);
-                  // cmd_3.Pos = joint_param_3.rotor_zero; PosPID_UpdateCmd(&cmd_3, cmd_3.Pos, &Pospid[3]);
-                  // cmd_4.Pos = joint_param_4.rotor_zero; PosPID_UpdateCmd(&cmd_4, cmd_4.Pos, &Pospid[4]);
-                  // cmd_5.Pos = joint_param_5.rotor_zero; PosPID_UpdateCmd(&cmd_5, cmd_5.Pos, &Pospid[5]);
-                  // cmd_6.Pos = joint_param_6.rotor_zero; PosPID_UpdateCmd(&cmd_6, cmd_6.Pos, &Pospid[6]);
-                  // cmd_7.Pos = joint_param_7.rotor_zero; PosPID_UpdateCmd(&cmd_7, cmd_7.Pos, &Pospid[7]);
-                  cmd_0.Pos = output_to_rotor(0, &joint_param_0); PosPID_UpdateCmd(&cmd_0, 0, &Pospid[0]);
-                  cmd_1.Pos = output_to_rotor(0, &joint_param_1); PosPID_UpdateCmd(&cmd_1, -2*PI, &Pospid[1]);
-                  cmd_2.Pos = output_to_rotor(PI, &joint_param_2); PosPID_UpdateCmd(&cmd_2, PI, &Pospid[2]);
-                  cmd_3.Pos = output_to_rotor(PI, &joint_param_3); PosPID_UpdateCmd(&cmd_3, PI, &Pospid[3]);
-                  cmd_4.Pos = output_to_rotor(PI, &joint_param_4); PosPID_UpdateCmd(&cmd_4, PI, &Pospid[4]);
-                  cmd_5.Pos = output_to_rotor(PI, &joint_param_5); PosPID_UpdateCmd(&cmd_5, PI, &Pospid[5]);
-                  cmd_6.Pos = output_to_rotor(0, &joint_param_6); PosPID_UpdateCmd(&cmd_6, -2*PI, &Pospid[6]);
-                  cmd_7.Pos = output_to_rotor(0, &joint_param_7); PosPID_UpdateCmd(&cmd_7, 0, &Pospid[7]);
-                  time = 0.0f;
+                  if(mode == 1)
+                  {
+                    cmd_0.Pos = output_to_rotor(-PI, &joint_param_0); PosPID_UpdateCmd(&cmd_0, 0, &Pospid[0]);
+                    cmd_1.Pos = output_to_rotor(0, &joint_param_1); PosPID_UpdateCmd(&cmd_1, -PI, &Pospid[1]);
+                    cmd_2.Pos = output_to_rotor(-PI, &joint_param_2); PosPID_UpdateCmd(&cmd_2, PI, &Pospid[2]);
+                    cmd_3.Pos = output_to_rotor(0, &joint_param_3); PosPID_UpdateCmd(&cmd_3, PI, &Pospid[3]);
+                    cmd_4.Pos = output_to_rotor(-PI, &joint_param_4); PosPID_UpdateCmd(&cmd_4, PI, &Pospid[4]);
+                    cmd_5.Pos = output_to_rotor(0, &joint_param_5); PosPID_UpdateCmd(&cmd_5, PI, &Pospid[5]);
+                    cmd_6.Pos = output_to_rotor(0, &joint_param_6); PosPID_UpdateCmd(&cmd_6, -2*PI, &Pospid[6]);
+                    cmd_7.Pos = output_to_rotor(-PI, &joint_param_7); PosPID_UpdateCmd(&cmd_7, 0, &Pospid[7]);
+                    time = 0.0f;
+                  }
+                  if(mode == 2)
+                  {
+                      if(go_dir == 1) 
+                      {
+                        time += dt; 
+                        if(time > traj_param.period) time -= traj_param.period;
+                        else if(time < 0) time += traj_param.period;
+                      }//前进             
+                      else if(go_dir == 2) 
+                      {
+                        time -= dt;
+                        if(time > traj_param.period) time -= traj_param.period;
+                        else if(time < 0) time += traj_param.period;
+                        // if(temp_t > traj_param.period) temp_t -= traj_param.period;
+                        // else if(time < 0) time += traj_param.period;
+                        // time = traj_param.period-temp_t; 
+                      }//后退
+                      else if(go_dir == 3) 
+                      {
+                        F_time += dt;
+                        R_time -= dt;
+                        
+                        if(F_time > traj_param.period) F_time -= traj_param.period;
+                        else if(F_time < 0) F_time += traj_param.period;
+                        if(R_time > traj_param.period) R_time -= traj_param.period;
+                        else if(R_time < 0) R_time += traj_param.period;
+                      }//原地右转
+                      else if(go_dir == 4) 
+                      {
+                        F_time -= dt;
+                        R_time += dt;
+                        
+                        if(F_time > traj_param.period) F_time -= traj_param.period;
+                        else if(F_time < 0) F_time += traj_param.period;
+                        if(R_time > traj_param.period) R_time -= traj_param.period;
+                        else if(R_time < 0) R_time += traj_param.period;
+                      }//原地左转
+                      if(go_dir == 1 || go_dir == 2)
+                      {
+                        foot_ellipse_trajectory(time, &traj_param, &P.x, &P.y); 
+                        
+                        if(fivebar_inverse(P.x, P.y, &theta0_out, &theta1_out, true))//左前腿和右后腿 0，1，4，5
+                        {
+                          go_0_pos= theta1_out;
+                          go_1_pos =theta0_out;
+                          
+                          go_4_pos = theta1_out;                   
+                          go_5_pos = theta0_out; 
+              
+                          cmd_0.Pos = output_to_rotor(go_0_pos, &joint_param_0); PosPID_UpdateCmd(&cmd_0, go_0_pos, &Pospid[0]);//正向                        
+                  
+                          cmd_1.Pos = output_to_rotor(go_1_pos, &joint_param_1); PosPID_UpdateCmd(&cmd_1, go_1_pos, &Pospid[1]);//正向   
+
+                          cmd_4.Pos = output_to_rotor(go_4_pos, &joint_param_4); PosPID_UpdateCmd(&cmd_4, go_4_pos, &Pospid[4]);//正向                    
+                        
+                          cmd_5.Pos = output_to_rotor(go_5_pos, &joint_param_5); PosPID_UpdateCmd(&cmd_5, go_5_pos, &Pospid[5]);//正向
+                        }
+
+                        foot_ellipse_trajectory((time+traj_param.period/2.0f), &traj_param, &P.x, &P.y);
+                        if(fivebar_inverse(P.x, P.y, &theta0_out, &theta1_out, true))//左后腿和右前腿 2，3，6，7   
+                        {
+                          go_2_pos = theta1_out; 
+                          go_3_pos = theta0_out; 
+                          
+                          go_7_pos = theta1_out;
+                          go_6_pos = theta0_out;  
+                          // cmd_2.Pos = output_to_rotor((PI-theta0_out), &joint_param_2); PosPID_UpdateCmd(&cmd_2, (PI-theta0_out), &Pospid[2]); //反向                  
+                          cmd_2.Pos = output_to_rotor(go_2_pos, &joint_param_2);      PosPID_UpdateCmd(&cmd_2, go_2_pos, &Pospid[2]); //正向  
+                          
+                          // cmd_3.Pos = output_to_rotor(theta1_out, &joint_param_3);      PosPID_UpdateCmd(&cmd_3, theta1_out, &Pospid[3]);//反向            
+                          cmd_3.Pos = output_to_rotor(go_3_pos, &joint_param_3); PosPID_UpdateCmd(&cmd_3, go_3_pos, &Pospid[3]);//正向 
+
+                          // cmd_7.Pos = output_to_rotor(theta0_out, &joint_param_7);      PosPID_UpdateCmd(&cmd_7, theta0_out, &Pospid[7]);//反向                   
+                          cmd_7.Pos = output_to_rotor(go_7_pos, &joint_param_7); PosPID_UpdateCmd(&cmd_7, go_7_pos, &Pospid[7]);//正向             
+                  
+                          // cmd_6.Pos = output_to_rotor((PI-theta1_out), &joint_param_6); PosPID_UpdateCmd(&cmd_6, (PI-theta1_out), &Pospid[6]);//反向             
+                          cmd_6.Pos = output_to_rotor(go_6_pos, &joint_param_6);      PosPID_UpdateCmd(&cmd_6, go_6_pos, &Pospid[6]);//正向
+                        }
+                      }
+                      if(go_dir == 3 || go_dir == 4)
+                      {
+                        
+                        foot_ellipse_trajectory(F_time, &traj_param, &P.x, &P.y);                        
+                        if(fivebar_inverse(P.x, P.y, &theta0_out, &theta1_out, true))//左前腿 0，1
+                        {
+                          go_0_pos = theta1_out;
+                          go_1_pos = theta0_out;
+
+                          cmd_0.Pos = output_to_rotor(go_0_pos, &joint_param_0); PosPID_UpdateCmd(&cmd_0, (PI-theta1_out), &Pospid[0]);//正向
+                          cmd_1.Pos = output_to_rotor(go_1_pos, &joint_param_1); PosPID_UpdateCmd(&cmd_1, theta0_out, &Pospid[1]);//正向
+                        }
+
+                        foot_ellipse_trajectory(R_time+traj_param.period/2.0f, &traj_param, &P.x, &P.y);  
+                        if(fivebar_inverse(P.x, P.y, &theta0_out, &theta1_out, true))//右后腿 4，5
+                        {
+                          go_4_pos = theta1_out;                
+                          go_5_pos = theta0_out; 
+                    
+                          cmd_4.Pos = output_to_rotor(go_4_pos, &joint_param_4); PosPID_UpdateCmd(&cmd_4, (PI-theta0_out), &Pospid[4]);//反向                 
+                          cmd_5.Pos = output_to_rotor(go_5_pos, &joint_param_5); PosPID_UpdateCmd(&cmd_5, theta1_out, &Pospid[5]);//反向                    
+                        }
+
+                        foot_ellipse_trajectory((F_time+traj_param.period/2.0f), &traj_param, &P.x, &P.y);
+                        if(fivebar_inverse(P.x, P.y, &theta0_out, &theta1_out, true))//左后腿 6，7  
+                        {                       
+                          go_7_pos=  theta1_out;
+                          go_6_pos = theta0_out;  
+            
+                          cmd_6.Pos = output_to_rotor(go_6_pos, &joint_param_6); PosPID_UpdateCmd(&cmd_6, theta0_out, &Pospid[6]);//正向                  
+                          cmd_7.Pos = output_to_rotor(go_7_pos, &joint_param_7); PosPID_UpdateCmd(&cmd_7, (PI-theta1_out), &Pospid[7]);//正向                            
+                        } 
+
+                        foot_ellipse_trajectory((R_time), &traj_param, &P.x, &P.y);
+                        if(fivebar_inverse(P.x, P.y, &theta0_out, &theta1_out, true))//右前腿 2，3，  
+                        {
+                          go_2_pos = theta1_out; 
+                          go_3_pos = theta0_out; 
+
+                          cmd_2.Pos = output_to_rotor(go_2_pos, &joint_param_2); PosPID_UpdateCmd(&cmd_2, (PI-theta0_out), &Pospid[2]); //反向                  
+                          cmd_3.Pos = output_to_rotor(go_3_pos, &joint_param_3); PosPID_UpdateCmd(&cmd_3, theta1_out, &Pospid[3]);//反向
+                        }                        
+                      }             
+                  }
                 }
-                if(mode == 2)
+                else if (control_mode == 1) 
                 {
+                  foot_motion_0.output_now_0 = rotor_to_output(data_0.Pos, &joint_param_0);
+                  foot_motion_0.output_now_1 = rotor_to_output(data_1.Pos, &joint_param_1);
+                  foot_motion_1.output_now_0 = rotor_to_output(data_2.Pos, &joint_param_2);
+                  foot_motion_1.output_now_1 = rotor_to_output(data_3.Pos, &joint_param_3);
+                  foot_motion_2.output_now_0 = rotor_to_output(data_4.Pos, &joint_param_4);
+                  foot_motion_2.output_now_1 = rotor_to_output(data_5.Pos, &joint_param_5);
+                  foot_motion_3.output_now_1 = rotor_to_output(data_6.Pos, &joint_param_6);
+                  foot_motion_3.output_now_0 = rotor_to_output(data_7.Pos, &joint_param_7);
+
+                  foot_motion_0.omega1 = data_1.W * joint_param_1.dir / joint_param_1.ratio;
+                  foot_motion_0.omega2 = data_0.W * joint_param_0.dir / joint_param_0.ratio;
+                  foot_motion_0.now_tau1 = data_1.T * joint_param_1.dir * joint_param_1.ratio;
+                  foot_motion_0.now_tau2 = data_0.T * joint_param_0.dir * joint_param_0.ratio;
+                  foot_motion_1.omega1 = data_3.W * joint_param_3.dir / joint_param_3.ratio;
+                  foot_motion_1.omega2 = data_2.W * joint_param_2.dir / joint_param_2.ratio;
+                  foot_motion_1.now_tau1 = data_3.T * joint_param_3.dir * joint_param_3.ratio;
+                  foot_motion_1.now_tau2 = data_2.T * joint_param_2.dir * joint_param_2.ratio;
+                  foot_motion_2.omega1 = data_5.W * joint_param_5.dir / joint_param_5.ratio;
+                  foot_motion_2.omega2 = data_4.W * joint_param_4.dir / joint_param_4.ratio;
+                  foot_motion_2.now_tau1 = data_5.T * joint_param_5.dir * joint_param_5.ratio;
+                  foot_motion_2.now_tau2 = data_4.T * joint_param_4.dir * joint_param_4.ratio;
+                  foot_motion_3.omega1 = data_6.W * joint_param_6.dir / joint_param_6.ratio;
+                  foot_motion_3.omega2 = data_7.W * joint_param_7.dir / joint_param_7.ratio;
+                  foot_motion_3.now_tau1 = data_6.T * joint_param_6.dir * joint_param_6.ratio;
+                  foot_motion_3.now_tau2 = data_7.T * joint_param_7.dir * joint_param_7.ratio;
+                  if(mode == 1)
+                  {
+                    foot_motion_0.G_1 = -25.0f;
+                    foot_motion_1.G_1 = -25.0f;
+                    foot_motion_2.G_1 = -20.0f;
+                    foot_motion_3.G_1 = -20.0f;
+                    foot_motion_0.P.x = 0; foot_motion_0.P.y = -0.173f;
+                    foot_motion_1.P.x = 0; foot_motion_1.P.y = -0.173f;
+                    foot_motion_2.P.x = 0; foot_motion_2.P.y = -0.173f;
+                    foot_motion_3.P.x = 0; foot_motion_3.P.y = -0.173f;
+                  }
+                  if(mode == 2)
+                  {
                     if(go_dir == 1) 
                     {
                       time += dt; 
@@ -509,104 +715,139 @@ void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim)
                     }//后退
                     else if(go_dir == 3) 
                     {
-                      time += dt;
-                      if(time > traj_param.period) time -= traj_param.period;
-                      else if(time < 0) time += traj_param.period;
+                      F_time += dt;
+                      R_time -= dt;                     
+                      if(F_time > traj_param.period) F_time -= traj_param.period;
+                      else if(F_time < 0) F_time += traj_param.period;
+                      if(R_time > traj_param.period) R_time -= traj_param.period;
+                      else if(R_time < 0) R_time += traj_param.period;
                     }//原地右转
                     else if(go_dir == 4) 
                     {
-                      time -= dt;
-                      if(time > traj_param.period) time -= traj_param.period;
-                      else if(time < 0) time += traj_param.period;
+                      F_time -= dt;
+                      R_time += dt;
+                        
+                      if(F_time > traj_param.period) F_time -= traj_param.period;
+                      else if(F_time < 0) F_time += traj_param.period;
+                      if(R_time > traj_param.period) R_time -= traj_param.period;
+                      else if(R_time < 0) R_time += traj_param.period;
                     }//原地左转
+                    if(time> traj_param.period/2.0f && time < traj_param.period) 
+                    {
+                      foot_motion_0.motion_state = 1; 
+                      foot_motion_1.motion_state = 0;
+                      foot_motion_2.motion_state = 1; 
+                      foot_motion_3.motion_state = 0;// 0支撑相，1摆动相
+                    }
+                    else
+                    {
+                      foot_motion_0.motion_state = 0; 
+                      foot_motion_1.motion_state = 1;
+                      foot_motion_2.motion_state = 0; 
+                      foot_motion_3.motion_state = 1;// 0支撑相，1摆动相
+                    }
+                    if(foot_motion_0.motion_state == 0) foot_motion_0.G_1 = -68.0f; else foot_motion_0.G_1 = 0.0f;
+                    if(foot_motion_1.motion_state == 0) foot_motion_1.G_1 = -68.0f; else foot_motion_1.G_1 = 0.0f;
+                    if(foot_motion_2.motion_state == 0) foot_motion_2.G_1 = -55.0f; else foot_motion_2.G_1 = 0.0f;
+                    if(foot_motion_3.motion_state == 0) foot_motion_3.G_1 = -55.0f; else foot_motion_3.G_1 = 0.0f;
                     if(go_dir == 1 || go_dir == 2)
                     {
-                      foot_ellipse_trajectory(time, &traj_param, &P.x, &P.y); 
-                      
-                      if(fivebar_inverse(P.x, P.y, &theta0_out, &theta1_out, true))//左前腿和右后腿 0，1，4，5
-                      {
-                        if(theta1_out>0) go_0_pos= (PI-theta1_out);
-                        if(theta1_out<0) go_0_pos = -(PI+theta1_out);
-                        go_1_pos = theta0_out;
-                        go_4_pos = theta1_out;                   
-                        go_5_pos = (PI-theta0_out); 
-            
-                        cmd_0.Pos = output_to_rotor(go_0_pos, &joint_param_0); PosPID_UpdateCmd(&cmd_0, go_0_pos, &Pospid[0]);//正向                        
-                
-                        cmd_1.Pos = output_to_rotor(go_1_pos, &joint_param_1); PosPID_UpdateCmd(&cmd_1, go_1_pos, &Pospid[1]);//正向   
-
-                        cmd_4.Pos = output_to_rotor(go_4_pos, &joint_param_4); PosPID_UpdateCmd(&cmd_4, go_4_pos, &Pospid[4]);//正向                    
-                      
-                        cmd_5.Pos = output_to_rotor(go_5_pos, &joint_param_5); PosPID_UpdateCmd(&cmd_5, go_5_pos, &Pospid[5]);//正向
-                      }
-
-                      foot_ellipse_trajectory((time+traj_param.period/2.0f), &traj_param, &P.x, &P.y);
-                      if(fivebar_inverse(P.x, P.y, &theta0_out, &theta1_out, true))//左后腿和右前腿 2，3，6，7   
-                      {
-                        go_2_pos = theta1_out; 
-                        go_3_pos = (PI-theta0_out); 
-                        if(theta1_out>0) go_7_pos= (PI-theta1_out);
-                        if(theta1_out<0) go_7_pos = -(PI+theta1_out);
-                        go_6_pos = theta0_out;  
-                        // cmd_2.Pos = output_to_rotor((PI-theta0_out), &joint_param_2); PosPID_UpdateCmd(&cmd_2, (PI-theta0_out), &Pospid[2]); //反向                  
-                        cmd_2.Pos = output_to_rotor(go_2_pos, &joint_param_2);      PosPID_UpdateCmd(&cmd_2, go_2_pos, &Pospid[2]); //正向  
-                        
-                        // cmd_3.Pos = output_to_rotor(theta1_out, &joint_param_3);      PosPID_UpdateCmd(&cmd_3, theta1_out, &Pospid[3]);//反向            
-                        cmd_3.Pos = output_to_rotor(go_3_pos, &joint_param_3); PosPID_UpdateCmd(&cmd_3, go_3_pos, &Pospid[3]);//正向 
-
-                        // cmd_7.Pos = output_to_rotor(theta0_out, &joint_param_7);      PosPID_UpdateCmd(&cmd_7, theta0_out, &Pospid[7]);//反向                   
-                        cmd_7.Pos = output_to_rotor(go_7_pos, &joint_param_7); PosPID_UpdateCmd(&cmd_7, go_7_pos, &Pospid[7]);//正向             
-                
-                        // cmd_6.Pos = output_to_rotor((PI-theta1_out), &joint_param_6); PosPID_UpdateCmd(&cmd_6, (PI-theta1_out), &Pospid[6]);//反向             
-                        cmd_6.Pos = output_to_rotor(go_6_pos, &joint_param_6);      PosPID_UpdateCmd(&cmd_6, go_6_pos, &Pospid[6]);//正向
-                      }
+                      foot_ellipse_trajectory(time, &traj_param, &foot_motion_0.P.x, &foot_motion_0.P.y);
+                      foot_ellipse_trajectory(time+traj_param.period/2.0f, &traj_param, &foot_motion_1.P.x, &foot_motion_1.P.y);
+                      foot_ellipse_trajectory(time, &traj_param, &foot_motion_2.P.x, &foot_motion_2.P.y);
+                      foot_ellipse_trajectory(time+traj_param.period/2.0f, &traj_param, &foot_motion_3.P.x, &foot_motion_3.P.y);
                     }
-                    if(go_dir == 3 || go_dir == 4)
+                    // foot_motion_0.P.x = target_x; foot_motion_0.P.y = target_y;
+                    // foot_motion_1.P.x = target_x; foot_motion_1.P.y = target_y;
+                    // foot_motion_2.P.x = target_x; foot_motion_2.P.y = target_y;
+                    // foot_motion_3.P.x = target_x; foot_motion_3.P.y = target_y;
+                    // 计算期望足端速度 (对目标轨迹求导)
+                    foot_motion_0.target_vx =  (foot_motion_0.P.x - foot_motion_0.last_P.x) / dt;
+                    foot_motion_0.target_vy =  (foot_motion_0.P.y - foot_motion_0.last_P.y) / dt;
+                    foot_motion_0.last_P.x = foot_motion_0.P.x;
+                    foot_motion_0.last_P.y = foot_motion_0.P.y;
+                    foot_motion_1.target_vx =  (foot_motion_1.P.x - foot_motion_1.last_P.x) / dt;
+                    foot_motion_1.target_vy =  (foot_motion_1.P.y - foot_motion_1.last_P.y) / dt;
+                    foot_motion_1.last_P.x = foot_motion_1.P.x;
+                    foot_motion_1.last_P.y = foot_motion_1.P.y;
+                    foot_motion_2.target_vx =  (foot_motion_2.P.x - foot_motion_2.last_P.x) / dt;
+                    foot_motion_2.target_vy =  (foot_motion_2.P.y - foot_motion_2.last_P.y) / dt;
+                    foot_motion_2.last_P.x = foot_motion_2.P.x;
+                    foot_motion_2.last_P.y = foot_motion_2.P.y;
+                    foot_motion_3.target_vx =  (foot_motion_3.P.x - foot_motion_3.last_P.x) / dt;
+                    foot_motion_3.target_vy =  (foot_motion_3.P.y - foot_motion_3.last_P.y) / dt;
+                    foot_motion_3.last_P.x = foot_motion_3.P.x;
+                    foot_motion_3.last_P.y = foot_motion_3.P.y;             
+                  }
+                  if(fwd_kinematics_and_jacobian(foot_motion_0.output_now_1, foot_motion_0.output_now_0, true, &foot_motion_0.current_P, &foot_motion_0.J)) 
+                  {
+                    foot_motion_0.raw_vx = foot_motion_0.J.J00 * foot_motion_0.omega1 + foot_motion_0.J.J01 * foot_motion_0.omega2;
+                    foot_motion_0.raw_vy = foot_motion_0.J.J10 * foot_motion_0.omega1 + foot_motion_0.J.J11 * foot_motion_0.omega2;
+                    foot_motion_0.filtered_vx = VEL_ALPHA * foot_motion_0.raw_vx + (1.0f - VEL_ALPHA) * foot_motion_0.filtered_vx;
+                    foot_motion_0.filtered_vy = VEL_ALPHA * foot_motion_0.raw_vy + (1.0f - VEL_ALPHA) * foot_motion_0.filtered_vy;
+                    foot_motion_0.Fx = foot_motion_0.Kp_x * (foot_motion_0.P.x - foot_motion_0.current_P.x)+ foot_motion_0.Kd_xt * foot_motion_0.target_vx - foot_motion_0.Kd_xr*foot_motion_0.filtered_vx;
+                    foot_motion_0.Fy = foot_motion_0.G_1 + foot_motion_0.G_0 + foot_motion_0.Kp_y * (foot_motion_0.P.y - foot_motion_0.current_P.y)+ foot_motion_0.Kd_yt * foot_motion_0.target_vy - foot_motion_0.Kd_yr*foot_motion_0.filtered_vy;
+                    foot_motion_0.target_tau1 = (foot_motion_0.J.J00 * foot_motion_0.Fx + foot_motion_0.J.J10 * foot_motion_0.Fy)* joint_param_1.dir / joint_param_1.ratio;
+                    foot_motion_0.target_tau2 = (foot_motion_0.J.J01 * foot_motion_0.Fx + foot_motion_0.J.J11 * foot_motion_0.Fy)* joint_param_0.dir / joint_param_0.ratio;
+                    estimate_foot_force(foot_motion_0.now_tau1, foot_motion_0.now_tau2, &foot_motion_0.J, &foot_motion_0.Fx_real, &foot_motion_0.Fy_real);
+                    if(Enable)
                     {
-                      foot_ellipse_trajectory(time, &traj_param, &P.x, &P.y);    
-                      if(fivebar_inverse(P.x, P.y, &theta0_out, &theta1_out, true))//左前腿和右后腿 0，1，4，5
-                      {
-                        if(theta1_out>0) go_0_pos= (PI-theta1_out);
-                        if(theta1_out<0) go_0_pos = -(PI+theta1_out);
-                        go_1_pos = theta0_out;
-                        go_4_pos = theta1_out;                
-                        go_5_pos = (PI-theta0_out); 
-                        // cmd_0.Pos = output_to_rotor(theta0_out, &joint_param_0); PosPID_UpdateCmd(&cmd_0, theta0_out, &Pospid[0]);//反向
-                        cmd_0.Pos = output_to_rotor(go_0_pos, &joint_param_0); PosPID_UpdateCmd(&cmd_0, (PI-theta1_out), &Pospid[0]);//正向
-      
-                        // cmd_1.Pos = output_to_rotor((PI-theta1_out), &joint_param_1); PosPID_UpdateCmd(&cmd_1, (PI-theta1_out), &Pospid[1]);//反向 
-                        cmd_1.Pos = output_to_rotor(go_1_pos, &joint_param_1); PosPID_UpdateCmd(&cmd_1, theta0_out, &Pospid[1]);//正向                 
-
-                        cmd_4.Pos = output_to_rotor(go_5_pos, &joint_param_4); PosPID_UpdateCmd(&cmd_4, (PI-theta0_out), &Pospid[4]);//反向
-                        // cmd_4.Pos = output_to_rotor(theta1_out, &joint_param_4); PosPID_UpdateCmd(&cmd_4, theta1_out, &Pospid[4]);//正向                    
-                        
-                        cmd_5.Pos = output_to_rotor(go_4_pos, &joint_param_5); PosPID_UpdateCmd(&cmd_5, theta1_out, &Pospid[5]);//反向                    
-                        // cmd_5.Pos = output_to_rotor((PI-theta0_out), &joint_param_5); PosPID_UpdateCmd(&cmd_5, (PI-theta0_out), &Pospid[5]);//正向
-                      }
-
-                      foot_ellipse_trajectory((time+traj_param.period/2.0f), &traj_param, &P.x, &P.y);
-                      if(fivebar_inverse(P.x, P.y, &theta0_out, &theta1_out, true))//左后腿和右前腿 6，7，2，3，  
-                      {
-                        go_2_pos = theta1_out; 
-                        go_3_pos = (PI-theta0_out); 
-                        if(theta1_out>0) go_7_pos= (PI-theta1_out);
-                        if(theta1_out<0) go_7_pos = -(PI+theta1_out);
-                        go_6_pos = theta0_out;  
-                        // cmd_6.Pos = output_to_rotor((PI-theta1_out), &joint_param_6); PosPID_UpdateCmd(&cmd_6, (PI-theta1_out), &Pospid[6]);//反向             
-                        cmd_6.Pos = output_to_rotor(go_6_pos, &joint_param_6);      PosPID_UpdateCmd(&cmd_6, theta0_out, &Pospid[6]);//正向
-
-                        // cmd_7.Pos = output_to_rotor(theta0_out, &joint_param_7);      PosPID_UpdateCmd(&cmd_7, theta0_out, &Pospid[7]);//反向                   
-                        cmd_7.Pos = output_to_rotor(go_7_pos, &joint_param_7); PosPID_UpdateCmd(&cmd_7, (PI-theta1_out), &Pospid[7]);//正向  
-                        
-                        cmd_2.Pos = output_to_rotor(go_3_pos, &joint_param_2); PosPID_UpdateCmd(&cmd_2, (PI-theta0_out), &Pospid[2]); //反向                  
-                        // cmd_2.Pos = output_to_rotor(theta1_out, &joint_param_2);      PosPID_UpdateCmd(&cmd_2, theta1_out, &Pospid[2]); //正向   
-
-                        cmd_3.Pos = output_to_rotor(go_2_pos, &joint_param_3);      PosPID_UpdateCmd(&cmd_3, theta1_out, &Pospid[3]);//反向            
-                        // cmd_3.Pos = output_to_rotor((PI-theta0_out), &joint_param_3); PosPID_UpdateCmd(&cmd_3, (PI-theta0_out), &Pospid[3]);//正向   
-                      }                         
-                    }             
-                }
-
+                      cmd_1.T = foot_motion_0.target_tau1;
+                      cmd_0.T = foot_motion_0.target_tau2;
+                    }
+                  } 
+                  if(fwd_kinematics_and_jacobian(foot_motion_1.output_now_1, foot_motion_1.output_now_0, true, &foot_motion_1.current_P, &foot_motion_1.J)) 
+                  {
+                    foot_motion_1.raw_vx = foot_motion_1.J.J00 * foot_motion_1.omega1 + foot_motion_1.J.J01 * foot_motion_1.omega2;
+                    foot_motion_1.raw_vy = foot_motion_1.J.J10 * foot_motion_1.omega1 + foot_motion_1.J.J11 * foot_motion_1.omega2;
+                    foot_motion_1.filtered_vx = VEL_ALPHA * foot_motion_1.raw_vx + (1.0f - VEL_ALPHA) * foot_motion_1.filtered_vx;
+                    foot_motion_1.filtered_vy = VEL_ALPHA * foot_motion_1.raw_vy + (1.0f - VEL_ALPHA) * foot_motion_1.filtered_vy;
+                    foot_motion_1.Fx = foot_motion_1.Kp_x * (foot_motion_1.P.x - foot_motion_1.current_P.x)+ foot_motion_1.Kd_xt * foot_motion_1.target_vx - foot_motion_1.Kd_xr*foot_motion_1.filtered_vx;
+                    foot_motion_1.Fy = foot_motion_1.G_1 + foot_motion_1.G_0 + foot_motion_1.Kp_y * (foot_motion_1.P.y - foot_motion_1.current_P.y)+ foot_motion_1.Kd_yt * foot_motion_1.target_vy - foot_motion_1.Kd_yr*foot_motion_1.filtered_vy;
+                    foot_motion_1.target_tau1 = (foot_motion_1.J.J00 * foot_motion_1.Fx + foot_motion_1.J.J10 * foot_motion_1.Fy)* joint_param_3.dir / joint_param_3.ratio;
+                    foot_motion_1.target_tau2 = (foot_motion_1.J.J01 * foot_motion_1.Fx + foot_motion_1.J.J11 * foot_motion_1.Fy)* joint_param_2.dir / joint_param_2.ratio;
+                    estimate_foot_force(foot_motion_1.now_tau1, foot_motion_1.now_tau2, &foot_motion_1.J, &foot_motion_1.Fx_real, &foot_motion_1.Fy_real);
+                    if(Enable)
+                    {
+                      cmd_3.T = foot_motion_1.target_tau1;
+                      cmd_2.T = foot_motion_1.target_tau2;
+                    }
+                  }
+                  if(fwd_kinematics_and_jacobian(foot_motion_2.output_now_1, foot_motion_2.output_now_0, true, &foot_motion_2.current_P, &foot_motion_2.J)) 
+                  {
+                    foot_motion_2.raw_vx = foot_motion_2.J.J00 * foot_motion_2.omega1 + foot_motion_2.J.J01 * foot_motion_2.omega2;
+                    foot_motion_2.raw_vy = foot_motion_2.J.J10 * foot_motion_2.omega1 + foot_motion_2.J.J11 * foot_motion_2.omega2;
+                    foot_motion_2.filtered_vx = VEL_ALPHA * foot_motion_2.raw_vx + (1.0f - VEL_ALPHA) * foot_motion_2.filtered_vx;
+                    foot_motion_2.filtered_vy = VEL_ALPHA * foot_motion_2.raw_vy + (1.0f - VEL_ALPHA) * foot_motion_2.filtered_vy;
+                    foot_motion_2.Fx = foot_motion_2.Kp_x * (foot_motion_2.P.x - foot_motion_2.current_P.x)+ foot_motion_2.Kd_xt * foot_motion_2.target_vx - foot_motion_2.Kd_xr*foot_motion_2.filtered_vx;
+                    foot_motion_2.Fy = foot_motion_2.G_1 + foot_motion_2.G_0 + foot_motion_2.Kp_y * (foot_motion_2.P.y - foot_motion_2.current_P.y)+ foot_motion_2.Kd_yt * foot_motion_2.target_vy - foot_motion_2.Kd_yr*foot_motion_2.filtered_vy;
+                    foot_motion_2.target_tau1 = (foot_motion_2.J.J00 * foot_motion_2.Fx + foot_motion_2.J.J10 * foot_motion_2.Fy)* joint_param_5.dir / joint_param_5.ratio;
+                    foot_motion_2.target_tau2 = (foot_motion_2.J.J01 * foot_motion_2.Fx + foot_motion_2.J.J11 * foot_motion_2.Fy)* joint_param_4.dir / joint_param_4.ratio;
+                    estimate_foot_force(foot_motion_2.now_tau1, foot_motion_2.now_tau2, &foot_motion_2.J, &foot_motion_2.Fx_real, &foot_motion_2.Fy_real);
+                    if(Enable)
+                    {
+                      cmd_5.T = foot_motion_2.target_tau1;
+                      cmd_4.T = foot_motion_2.target_tau2;
+                    }     
+                  }
+                  if(fwd_kinematics_and_jacobian(foot_motion_3.output_now_1, foot_motion_3.output_now_0, true, &foot_motion_3.current_P, &foot_motion_3.J)) 
+                  {
+                    foot_motion_3.raw_vx = foot_motion_3.J.J00 * foot_motion_3.omega1 + foot_motion_3.J.J01 * foot_motion_3.omega2;
+                    foot_motion_3.raw_vy = foot_motion_3.J.J10 * foot_motion_3.omega1 + foot_motion_3.J.J11 * foot_motion_3.omega2;
+                    foot_motion_3.filtered_vx = VEL_ALPHA * foot_motion_3.raw_vx + (1.0f - VEL_ALPHA) * foot_motion_3.filtered_vx;
+                    foot_motion_3.filtered_vy = VEL_ALPHA * foot_motion_3.raw_vy + (1.0f - VEL_ALPHA) * foot_motion_3.filtered_vy;
+                    foot_motion_3.Fx = foot_motion_3.Kp_x * (foot_motion_3.P.x - foot_motion_3.current_P.x)+ foot_motion_3.Kd_xt * foot_motion_3.target_vx - foot_motion_3.Kd_xr*foot_motion_3.filtered_vx;
+                    foot_motion_3.Fy = foot_motion_3.G_1 + foot_motion_3.G_0 + foot_motion_3.Kp_y * (foot_motion_3.P.y - foot_motion_3.current_P.y)+ foot_motion_3.Kd_yt * foot_motion_3.target_vy - foot_motion_3.Kd_yr*foot_motion_3.filtered_vy;
+                    foot_motion_3.target_tau1 = (foot_motion_3.J.J00 * foot_motion_3.Fx + foot_motion_3.J.J10 * foot_motion_3.Fy)* joint_param_6.dir / joint_param_6.ratio;
+                    foot_motion_3.target_tau2 = (foot_motion_3.J.J01 * foot_motion_3.Fx + foot_motion_3.J.J11 * foot_motion_3.Fy)* joint_param_7.dir / joint_param_7.ratio;
+                    estimate_foot_force(foot_motion_3.now_tau1, foot_motion_3.now_tau2, &foot_motion_3.J, &foot_motion_3.Fx_real, &foot_motion_3.Fy_real);
+                    if(Enable)
+                    {
+                      cmd_7.T = foot_motion_3.target_tau2;
+                      cmd_6.T = foot_motion_3.target_tau1;
+                    }
+                  }
+                }             
             }
             else if (run == 0) 
             {

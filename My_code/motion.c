@@ -2,8 +2,7 @@
     正运动结算
 */
 #include "motion.h"
-#define L1 100.0f
-#define L2 200.0f
+
 #define EPS 1e-6f
 
 double PI_VAL = 3.14159265358979323846;
@@ -15,8 +14,8 @@ bool fivebar_inverse(float x, float y,float *theta1,float *theta2,bool elbow_up)
  *
  * @param  time    当前累计时间 (秒)
  * @param  param   轨迹参数
- * @param  x       输出足端 x 坐标 (mm)
- * @param  y       输出足端 y 坐标 (mm)
+ * @param  x       输出足端 x 坐标 (m)
+ * @param  y       输出足端 y 坐标 (m)
  *
  *  轨迹说明：
  *  - φ ∈ [0 , π]       → 支撑相（贴地）
@@ -48,6 +47,68 @@ void foot_ellipse_trajectory(float time,FootTrajParam *param,float *x,float *y)
         *y = param->stand_height
              - param->step_height * sinf(phi);
     }
+}
+
+/**
+ * @brief  高度优化的联合结算函数 (正解 + 雅可比)
+ * 一次调用完成位置感知与力控映射准备
+ */
+bool fwd_kinematics_and_jacobian(float theta1, float theta2, bool elbow_up, 
+                                 Point2D *P, JacobianMatrix *J)
+{
+    // 1. 仅调用一次三角函数计算主动杆坐标
+    float Ax = L1 * arm_cos_f32(theta1);
+    float Ay = L1 * arm_sin_f32(theta1);
+    float Bx = L1 * arm_cos_f32(theta2);
+    float By = L1 * arm_sin_f32(theta2);
+
+    float dx = Bx - Ax;
+    float dy = By - Ay;
+    float d2 = dx*dx + dy*dy; // 优化：直接用平方判断，延迟开方
+
+    if (d2 < EPS || d2 > 4.0f * L2 * L2) return false;
+
+    float d = sqrtf(d2);
+    float mx = (Ax + Bx) * 0.5f;
+    float my = (Ay + By) * 0.5f;
+    
+    float h_sq = L2*L2 - d2*0.25f;
+    if (h_sq < 0.0f) return false;
+    float h = sqrtf(h_sq);
+
+    float nx = -dy / d;
+    float ny =  dx / d;
+
+    // 2. 结算当前足端坐标
+    if (elbow_up) {
+        P->x = mx + h * nx;
+        P->y = my + h * ny;
+    } else {
+        P->x = mx - h * nx;
+        P->y = my - h * ny;
+    }
+
+    // 3. 复用 Ax, Ay, Bx, By，无缝衔接雅可比矩阵计算 (0次三角函数开销)
+    float dx1 = P->x - Ax;
+    float dy1 = P->y - Ay;
+    float dx2 = P->x - Bx;
+    float dy2 = P->y - By;
+
+    float B00 = P->y * Ax - P->x * Ay; // 完全取代了 L1*(Y*cos - X*sin)
+    float B11 = P->y * Bx - P->x * By;
+
+    float detA = (dx1 * dy2) - (dx2 * dy1);
+    
+    // 奇异点保护
+    if (fabsf(detA) < 1e-4f) return false;
+
+    float inv_detA = 1.0f / detA;
+    J->J00 =  dy2 * B00 * inv_detA;
+    J->J01 = -dy1 * B11 * inv_detA;
+    J->J10 = -dx2 * B00 * inv_detA;
+    J->J11 =  dx1 * B11 * inv_detA;
+
+    return true;
 }
 
 /**
@@ -164,26 +225,13 @@ bool fivebar_inverse(float x, float y,
     {
         angle_1 = alpha + delta;
         angle_2 = alpha - delta;
-        // *theta1 = alpha + delta;
-        // *theta2 = alpha - delta;
     }
     else
     {
         angle_1 = alpha - delta;
         angle_2 = alpha + delta;
-        // *theta1 = alpha - delta;
-        // *theta2 = alpha + delta;
     }
-    wrap_pi_fast((&angle_1));
-    wrap_pi_fast((&angle_2));
-    // if(angle_1>-PI_VAL/2)
-    // {
-    //     *theta1 = angle_1;
-    // }
-    // if(angle_2>-PI_VAL&&angle_2<-0)
-    // {
-    //     *theta2 = angle_2;
-    // }
+
     *theta1 = angle_1;
     *theta2 = angle_2;
     return true;
@@ -211,13 +259,13 @@ float output_to_rotor_stand(float theta_out, JointParam *param)
 }
 float output_to_rotor(float theta_out, JointParam *param)
 {
-    if(theta_out-param->output_zero > PI)
-    return ((theta_out-param->output_zero-TWO_PI) * param->ratio) / param->dir
-        + param->rotor_zero;
-    else if(theta_out-param->output_zero < -PI)
-    return ((theta_out-param->output_zero+TWO_PI) * param->ratio) / param->dir
-        + param->rotor_zero;
-    else
+    // if(theta_out-param->output_zero > PI)
+    // return ((theta_out-param->output_zero-TWO_PI) * param->ratio) / param->dir
+    //     + param->rotor_zero;
+    // else if(theta_out-param->output_zero < -PI)
+    // return ((theta_out-param->output_zero+TWO_PI) * param->ratio) / param->dir
+    //     + param->rotor_zero;
+    // else
     return ((theta_out-param->output_zero) * param->ratio) / param->dir
         + param->rotor_zero;
 }
@@ -260,3 +308,42 @@ void wrap_pi_fast(float *angle)
     *angle = a - PI;
 }
 
+
+
+Filter2ndState vx_filter = {0, 0, 0, 0};
+Filter2ndState vy_filter = {0, 0, 0, 0};
+
+// 二阶低通滤波函数 (基于 1kHz 采样, 30Hz 截止频率预计算的参数)
+// 如果需要更改频率，可以用 MATLAB/Python 的 scipy.signal.butter 重新生成系数
+float apply_2nd_order_lpf(float input, Filter2ndState *s) 
+{
+    // 预计算的滤波系数 (b为前馈，a为反馈)
+    const float b0 = 0.008074f, b1 = 0.016148f, b2 = 0.008074f;
+    const float a1 = -1.74534f, a2 = 0.77764f;
+
+    // 差分方程计算
+    float output = b0 * input + b1 * s->x1 + b2 * s->x2 
+                 - a1 * s->y1 - a2 * s->y2;
+
+    // 更新历史状态
+    s->x2 = s->x1;  s->x1 = input;
+    s->y2 = s->y1;  s->y1 = output;
+
+    return output;
+}
+
+void estimate_foot_force(float tau1, float tau2, JacobianMatrix *J, float *Fx_real, float *Fy_real) 
+{
+    // 计算 J^T 的行列式
+    float detJT = (J->J00 * J->J11) - (J->J10 * J->J01);
+    
+    if (fabsf(detJT) > 1e-4f) {
+        float inv_det = 1.0f / detJT;
+        // 计算逆矩阵并乘上实际力矩
+        *Fx_real =  (J->J11 * tau1 - J->J10 * tau2) * inv_det;
+        *Fy_real = (-J->J01 * tau1 + J->J00 * tau2) * inv_det;
+    } else {
+        *Fx_real = 0.0f;
+        *Fy_real = 0.0f;
+    }
+}
