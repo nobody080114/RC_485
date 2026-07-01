@@ -57,6 +57,7 @@ target_sources(${CMAKE_PROJECT_NAME} PRIVATE
     My_code/my_system.c
     My_code/pid.c
     My_code/CRSF.c
+    My_code/com_uart.c
     Drivers/CMSIS/DSP/Source/FastMathFunctions/arm_cos_f32.c
     Drivers/CMSIS/DSP/Source/FastMathFunctions/arm_sin_f32.c
     Drivers/CMSIS/DSP/Source/CommonTables/arm_common_tables.c

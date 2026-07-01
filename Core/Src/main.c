@@ -18,12 +18,10 @@
 /* USER CODE END Header */
 /* Includes ------------------------------------------------------------------*/
 #include "main.h"
-#include "control.h"
 #include "dma.h"
 #include "tim.h"
 #include "usart.h"
 #include "gpio.h"
-#include <stdint.h>
 
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
@@ -56,18 +54,18 @@ FootTrajParam traj_param;
 Point2D P,current_P;
 JointParam joint_param_0, joint_param_1, joint_param_2, joint_param_3, joint_param_4, joint_param_5, joint_param_6, joint_param_7;
 PosPID_t Pospid[8];
+float G_0 = -72.0F,G_1 = -72.0f,G_2 = -68.0f,G_3 = -68.0f;
 float time = 0.0f,F_time = 0.0f,R_time = 0.0f,dt = 0.001f;
 float theta0_out = 0, theta1_out = 0;
 float go_0_pos=0,go_1_pos=0,go_2_pos=0,go_3_pos=0,go_4_pos=0,go_5_pos=0,go_6_pos=0,go_7_pos=0;
 int8_t start = 0,start_1 = 0,run  = 0,flag_1 = 1,mode = 0,control_mode = 0,Enable = 0,go_dir = 0,stand_state = 0;
 //go_dir: 1-前进，2-后退，3-左移，4-右移
-uint16_t speed = 0,speed_state = 0;//speed_state: 0-停止，1-低速，2-中速，3-高速
+uint16_t speed = 0,speed_state = 0,last_speed_state = 0;//speed_state: 0-停止，1-低速，2-中速，3-高速
 uint32_t zhen = 0,cnt = 0;
 uint16_t Key[10];
 uint16_t cnt_tx = 0;
 Filter2ndState filter_w1 = {0};
 Filter2ndState filter_w2 = {0};
-
 Foot_motion foot_motion_0 = {
  .Kp_x = 400, // X方向的比例增益 (N/m)
  .Kd_xt = 25,  // X轴前馈阻尼系数 (N·s/m)
@@ -165,6 +163,7 @@ int main(void)
   MX_TIM1_Init();
   MX_USART3_UART_Init();
   MX_UART5_Init();
+  MX_USART1_UART_Init();
   /* USER CODE BEGIN 2 */
   DWT_Init();
   HAL_Delay(500);
@@ -263,7 +262,8 @@ int main(void)
   cmd_4.T = 0;      cmd_5.T = 0;      cmd_6.T = 0;     cmd_7.T = 0;
   HAL_TIM_Base_Start_IT(&htim1); // 启动定时器1的中断，定时器1的周期由cubemx设置，这里是1ms
   CRSF_Init();
-
+  COM_UART_Init();
+  // HAL_UART_Receive_IT(&huart1, (uint8_t *)com_rx_data, 14);
   // HAL_UART_Receive_IT(&huart5, (uint8_t *)pData, 26);
   /* USER CODE END 2 */
 
@@ -277,16 +277,18 @@ int main(void)
     RS485_Schedule(&rs485);
     // CRSF_Decode();
     CRSF_Key_Get(Key);
-    if(Key[1] >= 1200 && Key[0]>=800 && Key[0]<=1200) go_dir = 1; //前进拨键
-    else if(Key[1] <= 800 && Key[0]>=800 && Key[0]<=1200) go_dir = 2; //后退拨键
-    else if(Key[0] >= 1200 && Key[1]>=800 && Key[1]<=1200) go_dir = 3;//原地右转拨键
-    else if(Key[0] <= 800 && Key[1]>=800 && Key[1]<=1200) go_dir = 4;//原地左转拨键
-    else if (Key[0] >= 1200 && Key[1]>=1200) go_dir = 5;//右前斜移拨键
-    else if (Key[0] <= 800 && Key[1]>=1200) go_dir = 6;//左前斜移拨键
-    else if (Key[0] >= 1200 && Key[1]<=800) go_dir = 7;//右后斜移拨键
-    else if (Key[0] <= 800 && Key[1]<=800) go_dir = 8;//左后斜移拨键
-    else go_dir = 0;//停
-
+    if(control_mode == 0 || control_mode == 1)
+    {
+      if(Key[1] >= 1200 && Key[0]>=800 && Key[0]<=1200) go_dir = 1; //前进拨键
+      else if(Key[1] <= 800 && Key[0]>=800 && Key[0]<=1200) go_dir = 2; //后退拨键
+      else if(Key[0] >= 1200 && Key[1]>=800 && Key[1]<=1200) go_dir = 3;//原地右转拨键
+      else if(Key[0] <= 800 && Key[1]>=800 && Key[1]<=1200) go_dir = 4;//原地左转拨键
+      else if (Key[0] >= 1200 && Key[1]>=1200) go_dir = 5;//右前斜移拨键
+      else if (Key[0] <= 800 && Key[1]>=1200) go_dir = 6;//左前斜移拨键
+      else if (Key[0] >= 1200 && Key[1]<=800) go_dir = 7;//右后斜移拨键
+      else if (Key[0] <= 800 && Key[1]<=800) go_dir = 8;//左后斜移拨键
+      else go_dir = 0;//停
+    }
     if(run == 1) speed = Key[2]-174; else speed = 0;//左拨杆
     
     if(Key[7] == 1792) run = 1; else run = 0;///右按键
@@ -294,8 +296,8 @@ int main(void)
     if(Key[4] == 1792) Enable = 1; else Enable = 0;//左按键
     if(Key[5] == 191) mode = 1; else if(Key[5] == 997) mode = 2; else if(Key[5] == 1792) mode = 3;//左拨键
     // if(Key[9]<800) stand_state = 0; else if(Key[9]<1300 && Key[9]>=800) stand_state = 1; else stand_state = 2;//右上长按键
-    if(Key[6] == 191) control_mode = 0; else if(Key[5] == 997) control_mode = 1; else if(Key[5] == 1792) control_mode = 2;//右拨键 //0-位控，1-力控，2-混合控制
-
+    if(Key[6] == 191) control_mode = 0; else if(Key[6] == 997) control_mode = 1; else if(Key[6] == 1792) control_mode = 2;//右拨键 //0-位控，1-力控，2-自动控制
+    
     if(Enable)
     {
         if(flag_1 == 1)
@@ -314,7 +316,7 @@ int main(void)
         }
         else if(flag_1 == 2) 
         {
-            if(control_mode == 0)
+            if(control_mode == 0 || control_mode == 2)
             {
               cmd_0.T = 0;cmd_1.T = 0;cmd_2.T = 0;cmd_3.T = 0;
               cmd_4.T = 0;cmd_5.T = 0;cmd_6.T = 0;cmd_7.T = 0;  
@@ -516,11 +518,13 @@ void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim)
         if(flag_1 == 2)
         {
             if((run == 1))
-            {
-                if(speed>=1100) {traj_param.period = 0.25f;traj_param.step_length  = 0.080f;speed_state = 3;}
-                else if(speed<1100 && speed >= 400) {traj_param.period = 0.3f; traj_param.step_length  = 0.080f;speed_state = 2;}
+            {   
+                last_speed_state = speed_state;
+                if(speed>=1100) {traj_param.period = 0.25f;traj_param.step_length  = 0.100f;speed_state = 3;}
+                else if(speed<1100 && speed >= 400) {traj_param.period = 0.3f; traj_param.step_length  = 0.100f;speed_state = 2;}
                 else if(speed<400 && speed >=0) {traj_param.period = 0.4f; traj_param.step_length  = 0.100f; speed_state = 1;}
-                if(control_mode == 0)
+                if(last_speed_state!= speed_state) {R_time = 0.0f; F_time = 0.0f; time = 0.0f;}
+                if(control_mode == 0 || control_mode == 2)
                 {
                   if(mode == 1)
                   {
@@ -573,9 +577,9 @@ void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim)
                       }//原地左转
                       if(go_dir == 1 || go_dir == 2)
                       {
-                        foot_ellipse_trajectory(time, &traj_param, &P.x, &P.y); 
+                        foot_ellipse_trajectory(time, &traj_param, &foot_motion_0.P.x, &foot_motion_0.P.y);  //0，2
                         
-                        if(fivebar_inverse(P.x, P.y, &theta0_out, &theta1_out, true))//左前腿和右后腿 0，1，4，5
+                        if(fivebar_inverse(foot_motion_0.P.x, foot_motion_0.P.y, &theta0_out, &theta1_out, true))//左前腿和右后腿 0，1，4，5
                         {
                           go_0_pos= theta1_out;
                           go_1_pos =theta0_out;
@@ -592,8 +596,8 @@ void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim)
                           cmd_5.Pos = output_to_rotor(go_5_pos, &joint_param_5); PosPID_UpdateCmd(&cmd_5, go_5_pos, &Pospid[5]);//正向
                         }
 
-                        foot_ellipse_trajectory((time+traj_param.period/2.0f), &traj_param, &P.x, &P.y);
-                        if(fivebar_inverse(P.x, P.y, &theta0_out, &theta1_out, true))//左后腿和右前腿 2，3，6，7   
+                        foot_ellipse_trajectory((time+traj_param.period/2.0f), &traj_param, &foot_motion_1.P.x, &foot_motion_1.P.y); //1，3
+                        if(fivebar_inverse(foot_motion_1.P.x, foot_motion_1.P.y, &theta0_out, &theta1_out, true))//左后腿和右前腿 2，3，6，7   
                         {
                           go_2_pos = theta1_out; 
                           go_3_pos = theta0_out; 
@@ -616,8 +620,8 @@ void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim)
                       if(go_dir == 3 || go_dir == 4)
                       {
                         
-                        foot_ellipse_trajectory(F_time, &traj_param, &P.x, &P.y);                        
-                        if(fivebar_inverse(P.x, P.y, &theta0_out, &theta1_out, true))//左前腿 0，1
+                        foot_ellipse_trajectory(F_time, &traj_param, &foot_motion_0.P.x, &foot_motion_0.P.y);                        
+                        if(fivebar_inverse(foot_motion_0.P.x, foot_motion_0.P.y, &theta0_out, &theta1_out, true))//左前腿 0，1
                         {
                           go_0_pos = theta1_out;
                           go_1_pos = theta0_out;
@@ -626,8 +630,8 @@ void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim)
                           cmd_1.Pos = output_to_rotor(go_1_pos, &joint_param_1); PosPID_UpdateCmd(&cmd_1, theta0_out, &Pospid[1]);//正向
                         }
 
-                        foot_ellipse_trajectory(R_time+traj_param.period/2.0f, &traj_param, &P.x, &P.y);  
-                        if(fivebar_inverse(P.x, P.y, &theta0_out, &theta1_out, true))//右后腿 4，5
+                        foot_ellipse_trajectory(R_time+traj_param.period/2.0f, &traj_param, &foot_motion_1.P.x, &foot_motion_1.P.y);  
+                        if(fivebar_inverse(foot_motion_1.P.x, foot_motion_1.P.y, &theta0_out, &theta1_out, true))//右后腿 4，5
                         {
                           go_4_pos = theta1_out;                
                           go_5_pos = theta0_out; 
@@ -636,8 +640,8 @@ void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim)
                           cmd_5.Pos = output_to_rotor(go_5_pos, &joint_param_5); PosPID_UpdateCmd(&cmd_5, theta1_out, &Pospid[5]);//反向                    
                         }
 
-                        foot_ellipse_trajectory((F_time+traj_param.period/2.0f), &traj_param, &P.x, &P.y);
-                        if(fivebar_inverse(P.x, P.y, &theta0_out, &theta1_out, true))//左后腿 6，7  
+                        foot_ellipse_trajectory((F_time+traj_param.period/2.0f), &traj_param, &foot_motion_2.P.x, &foot_motion_2.P.y);
+                        if(fivebar_inverse(foot_motion_2.P.x, foot_motion_2.P.y, &theta0_out, &theta1_out, true))//左后腿 6，7  
                         {                       
                           go_7_pos=  theta1_out;
                           go_6_pos = theta0_out;  
@@ -646,8 +650,8 @@ void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim)
                           cmd_7.Pos = output_to_rotor(go_7_pos, &joint_param_7); PosPID_UpdateCmd(&cmd_7, (PI-theta1_out), &Pospid[7]);//正向                            
                         } 
 
-                        foot_ellipse_trajectory((R_time), &traj_param, &P.x, &P.y);
-                        if(fivebar_inverse(P.x, P.y, &theta0_out, &theta1_out, true))//右前腿 2，3，  
+                        foot_ellipse_trajectory((R_time), &traj_param, &foot_motion_3.P.x, &foot_motion_3.P.y);
+                        if(fivebar_inverse(foot_motion_3.P.x, foot_motion_3.P.y, &theta0_out, &theta1_out, true))//右前腿 2，3，  
                         {
                           go_2_pos = theta1_out; 
                           go_3_pos = theta0_out; 
@@ -746,10 +750,10 @@ void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim)
                       foot_motion_2.motion_state = 0; 
                       foot_motion_3.motion_state = 1;// 0支撑相，1摆动相
                     }
-                    if(foot_motion_0.motion_state == 0) foot_motion_0.G_1 = -68.0f; else foot_motion_0.G_1 = 0.0f;
-                    if(foot_motion_1.motion_state == 0) foot_motion_1.G_1 = -68.0f; else foot_motion_1.G_1 = 0.0f;
-                    if(foot_motion_2.motion_state == 0) foot_motion_2.G_1 = -55.0f; else foot_motion_2.G_1 = 0.0f;
-                    if(foot_motion_3.motion_state == 0) foot_motion_3.G_1 = -55.0f; else foot_motion_3.G_1 = 0.0f;
+                    if(foot_motion_0.motion_state == 0) foot_motion_0.G_1 = G_0; else foot_motion_0.G_1 = 0.0f;
+                    if(foot_motion_1.motion_state == 0) foot_motion_1.G_1 = G_1; else foot_motion_1.G_1 = 0.0f;
+                    if(foot_motion_2.motion_state == 0) foot_motion_2.G_1 = G_2; else foot_motion_2.G_1 = 0.0f;
+                    if(foot_motion_3.motion_state == 0) foot_motion_3.G_1 = G_3; else foot_motion_3.G_1 = 0.0f;
                     if(go_dir == 1 || go_dir == 2)
                     {
                       foot_ellipse_trajectory(time, &traj_param, &foot_motion_0.P.x, &foot_motion_0.P.y);
@@ -892,14 +896,19 @@ void HAL_UARTEx_RxEventCallback(UART_HandleTypeDef *huart, uint16_t Size)
       CRSF_Init();
       CRSF_AcceptData();
     }
+    else if(huart->Instance == USART1)
+    {
+      COM_UART_Init();
+      COM_UART_Handle();
+    }
 }
 
 // void HAL_UART_RxCpltCallback(UART_HandleTypeDef *huart)
 // {
 //     // 这个回调函数在使用空闲中断接收时不会被调用，可以留空或者删除
-//     if(huart->Instance == UART5)
+//     if(huart->Instance == USART1)
 //     {
-//       CRSF_AcceptData();
+//       HAL_UART_Receive_IT(&huart1, (uint8_t *)com_rx_data, 10);
 //     }
 // }
 

@@ -47,6 +47,7 @@ extern "C" {
 #include "my_system.h"
 #include "pid.h"
 #include "CRSF.h"
+#include "com_uart.h"
 #include <math.h>
 #include "arm_math.h"
 #include <stdlib.h>
