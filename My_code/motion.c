@@ -9,6 +9,7 @@ double PI_VAL = 3.14159265358979323846;
 
 bool fivebar_forward(float theta1, float theta2, Point2D *P, bool elbow_up);
 bool fivebar_inverse(float x, float y,float *theta1,float *theta2,bool elbow_up);
+extern Foot_motion foot_motion_0,foot_motion_1,foot_motion_2,foot_motion_3;
 /*
  * @brief  椭圆轨迹足端位置计算
  *
@@ -26,27 +27,33 @@ bool fivebar_inverse(float x, float y,float *theta1,float *theta2,bool elbow_up)
  *  - y 方向只在摆动相抬腿
  *  - 连续、无突变
  */
-void foot_ellipse_trajectory(float time,FootTrajParam *param,float *x,float *y)
+void foot_ellipse_trajectory(float time,Foot_motion *param,FootTrajParam *traj)
 {
-    float omega = 2.0f * PI_VAL / param->period;
+    float omega = 2.0f * PI_VAL / traj->period; // 角频率 (rad/s)
 
     // 相位范围限制在 0~2π
     float phi = fmodf(omega * time, 2.0f * PI_VAL);
 
     // X方向：完整余弦椭圆
-    *x = 0.5f * param->step_length * arm_cos_f32(phi);
+    param->P.x = 0.5f * param->track.step_length * arm_cos_f32(phi);
 
     // 支撑相（贴地）
     if (phi < PI_VAL)
     {
-        *y = param->stand_height;
+        param->P.y = param->track.stand_height;
     }
     // 摆动相（抬腿）
     else
     {
-        *y = param->stand_height
-             - param->step_height * sinf(phi);
+        param->P.y = param->track.stand_height
+                     - param->track.step_height * sinf(phi);
     }
+}
+
+void foot_ellipse_trajectory_dir(float time, Foot_motion *param, FootTrajParam *traj, float x_dir)
+{
+    foot_ellipse_trajectory(time, param, traj);
+    param->P.x *= x_dir;
 }
 
 /**
@@ -346,4 +353,24 @@ void estimate_foot_force(float tau1, float tau2, JacobianMatrix *J, float *Fx_re
         *Fx_real = 0.0f;
         *Fy_real = 0.0f;
     }
+}
+
+void set_left_right_step_length(float left_step, float right_step)
+{
+  foot_motion_0.track.step_length = left_step;   // left front
+  foot_motion_3.track.step_length = left_step;   // left rear
+  foot_motion_1.track.step_length = right_step;  // right front
+  foot_motion_2.track.step_length = right_step;  // right rear
+}
+
+void apply_curve_step_length(uint8_t dir, float base_step,float inner_ratio)
+{
+  float inner_step = base_step * inner_ratio;
+  float outer_step = base_step;
+
+  if(dir == 5 || dir == 7) {
+    set_left_right_step_length(outer_step, inner_step); // forward right / backward left
+  } else if(dir == 6 || dir == 8) {
+    set_left_right_step_length(inner_step, outer_step); // forward left / backward right
+  }
 }

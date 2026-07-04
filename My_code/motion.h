@@ -7,6 +7,8 @@
 #define TWO_PI (2.0f * PI)
 #define L1 0.100f // m
 #define L2 0.200f // m
+// #define TURN_INNER_STEP_RATIO 0.55f
+// #define TURN_OUTER_STEP_RATIO 1.00f
 typedef struct {
     float x;
     float y;
@@ -54,12 +56,14 @@ typedef struct{
     float omega1, omega2;
     Point2D P,current_P,last_P;
     JacobianMatrix J;
+    FootTrajParam track;
     uint8_t motion_state;//0支撑，1抬腿
 } Foot_motion;
 
 bool fivebar_forward(float theta1, float theta2, Point2D *P, bool elbow_up);
 bool fivebar_inverse(float x, float y,float *theta1,float *theta2,bool elbow_up);
-void foot_ellipse_trajectory(float time,FootTrajParam *param,float *x,float *y);
+void foot_ellipse_trajectory(float time,Foot_motion *param,FootTrajParam *traj);
+void foot_ellipse_trajectory_dir(float time, Foot_motion *param, FootTrajParam *traj, float x_dir);
 float output_to_rotor(float theta_out, JointParam *param);
 float rotor_to_output(float rotor_now, JointParam *param);
 void wrap_pi_fast(float *angle);
@@ -68,4 +72,7 @@ bool fwd_kinematics_and_jacobian(float theta1, float theta2, bool elbow_up,
                                  Point2D *P, JacobianMatrix *J);
 float apply_2nd_order_lpf(float input, Filter2ndState *s);
 void estimate_foot_force(float tau1, float tau2, JacobianMatrix *J, float *Fx_real, float *Fy_real);
+void set_left_right_step_length(float left_step, float right_step);
+void apply_curve_step_length(uint8_t dir, float base_step,float inner_ratio);
+
 #endif // MOTION_H

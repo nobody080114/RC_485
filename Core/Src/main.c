@@ -26,7 +26,6 @@
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
 
-// #include "CRSF.h"
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -49,63 +48,49 @@
 // 速度低通滤波器参数 (截止频率约 30~50Hz)
 // alpha 越小滤波越强，但延迟越大；alpha 越大越灵敏，但噪声越大。
 #define VEL_ALPHA 0.2f 
+
 RS485_Scheduler_t rs485;
 FootTrajParam traj_param;
 Point2D P,current_P;
 JointParam joint_param_0, joint_param_1, joint_param_2, joint_param_3, joint_param_4, joint_param_5, joint_param_6, joint_param_7;
 PosPID_t Pospid[8];
 float G_0 = -72.0F,G_1 = -72.0f,G_2 = -68.0f,G_3 = -68.0f;
-float time = 0.0f,F_time = 0.0f,R_time = 0.0f,dt = 0.001f;
+float time = 0.0f,dt = 0.001f;
 float theta0_out = 0, theta1_out = 0;
 float go_0_pos=0,go_1_pos=0,go_2_pos=0,go_3_pos=0,go_4_pos=0,go_5_pos=0,go_6_pos=0,go_7_pos=0;
 int8_t start = 0,start_1 = 0,run  = 0,flag_1 = 1,mode = 0,control_mode = 0,Enable = 0,go_dir = 0,stand_state = 0;
+// go_dir: 1-forward, 2-backward, 3-turn right, 4-turn left,
+//         5-forward right, 6-forward left, 7-backward right, 8-backward left
 //go_dir: 1-前进，2-后退，3-左移，4-右移
 uint16_t speed = 0,speed_state = 0,last_speed_state = 0;//speed_state: 0-停止，1-低速，2-中速，3-高速
-uint32_t zhen = 0,cnt = 0;
+uint32_t zhen = 0,cnt = 0,cnt_tx = 0;
 uint16_t Key[10];
-uint16_t cnt_tx = 0;
+float kp_x = 400.0f, kd_xt = 25.0f, kd_xr = 20.0f;
+float kp_y = 1000.0f, kd_yt = 115.0f, kd_yr = 87.0f;
+float inner_ratio = 0.55f;
 Filter2ndState filter_w1 = {0};
 Filter2ndState filter_w2 = {0};
 Foot_motion foot_motion_0 = {
- .Kp_x = 400, // X方向的比例增益 (N/m)
- .Kd_xt = 25,  // X轴前馈阻尼系数 (N·s/m)
- .Kd_xr = 20,  // X轴反馈阻尼系数 (N·s/m)
- .Kp_y = 1000,// Y方向的比例增益 (N/m)
- .Kd_yt = 115,  // Y轴前馈阻尼系数 (N·s/m)
- .Kd_yr = 87,  // Y轴反馈阻尼系数 (N·s/m)
- .G_0 = 3.2f, // 单腿重力补偿增益
- .G_1 = 0.0f // 单腿重力补偿增益
+ .Kp_x = 400, /* X方向的比例增益 (N/m) */ .Kd_xt = 25,  /* X轴前馈阻尼系数 (N·s/m) */ .Kd_xr = 20,  /* X轴反馈阻尼系数 (N·s/m)*/
+ .Kp_y = 1000,/* Y方向的比例增益 (N/m) */ .Kd_yt = 115,  /* Y轴前馈阻尼系数 (N·s/m)  */  .Kd_yr = 87,  /* Y轴反馈阻尼系数 (N·s/m) */
+ .G_0 = 3.2f, /* 单腿重力补偿增益 */ .G_1 = 0.0f /* 单腿重力补偿增益 */ 
 };
 
 Foot_motion foot_motion_1 = {
- .Kp_x = 400, // X方向的比例增益 (N/m)
- .Kd_xt = 25,  // X轴前馈阻尼系数 (N·s/m)
- .Kd_xr = 20,  // X轴反馈阻尼系数 (N·s/m)
- .Kp_y = 1000,// Y方向的比例增益 (N/m)
- .Kd_yt = 115,  // Y轴前馈阻尼系数 (N·s/m)
- .Kd_yr = 87,  // Y轴反馈阻尼系数 (N·s/m)
- .G_0 = 3.2f, // 单腿重力补偿增益
- .G_1 = 0.0f // 单腿重力补偿增益
+ .Kp_x = 400, /* X方向的比例增益 (N/m) */ .Kd_xt = 25,  /* X轴前馈阻尼系数 (N·s/m) */ .Kd_xr = 20,  /* X轴反馈阻尼系数 (N·s/m)*/
+ .Kp_y = 1000,/* Y方向的比例增益 (N/m) */ .Kd_yt = 115,  /* Y轴前馈阻尼系数 (N·s/m)  */  .Kd_yr = 87,  /* Y轴反馈阻尼系数 (N·s/m) */
+ .G_0 = 3.2f, /* 单腿重力补偿增益 */ .G_1 = 0.0f /* 单腿重力补偿增益 */
 };
+
 Foot_motion foot_motion_2 = {
- .Kp_x = 400, // X方向的比例增益 (N/m)
- .Kd_xt = 25,  // X轴前馈阻尼系数 (N·s/m)
- .Kd_xr = 20,  // X轴反馈阻尼系数 (N·s/m)
- .Kp_y = 1000,// Y方向的比例增益 (N/m)
- .Kd_yt = 115,  // Y轴前馈阻尼系数 (N·s/m)
- .Kd_yr = 87,  // Y轴反馈阻尼系数 (N·s/m)
- .G_0 = 3.2f, // 单腿重力补偿增益
- .G_1 = 0.0f // 单腿重力补偿增益
+ .Kp_x = 400, /* X方向的比例增益 (N/m) */ .Kd_xt = 25,  /* X轴前馈阻尼系数 (N·s/m) */ .Kd_xr = 20,  /* X轴反馈阻尼系数 (N·s/m)*/
+ .Kp_y = 1000,/* Y方向的比例增益 (N/m) */ .Kd_yt = 115,  /* Y轴前馈阻尼系数 (N·s/m)  */  .Kd_yr = 87,  /* Y轴反馈阻尼系数 (N·s/m) */
+ .G_0 = 3.2f, /* 单腿重力补偿增益 */ .G_1 = 0.0f /* 单腿重力补偿增益 */
 };
 Foot_motion foot_motion_3 = {
- .Kp_x = 400, // X方向的比例增益 (N/m)
- .Kd_xt = 25,  // X轴前馈阻尼系数 (N·s/m)
- .Kd_xr = 20,  // X轴反馈阻尼系数 (N·s/m)
- .Kp_y = 1000,// Y方向的比例增益 (N/m)
- .Kd_yt = 115,  // Y轴前馈阻尼系数 (N·s/m)
- .Kd_yr = 87,  // Y轴反馈阻尼系数 (N·s/m)
- .G_0 = 3.2f, // 单腿重力补偿增益
-  .G_1 = 0.0f // 单腿重力补偿增益
+ .Kp_x = 400, /* X方向的比例增益 (N/m) */ .Kd_xt = 25,  /* X轴前馈阻尼系数 (N·s/m) */ .Kd_xr = 20,  /* X轴反馈阻尼系数 (N·s/m)*/
+ .Kp_y = 1000,/* Y方向的比例增益 (N/m) */ .Kd_yt = 115,  /* Y轴前馈阻尼系数 (N·s/m)  */  .Kd_yr = 87,  /* Y轴反馈阻尼系数 (N·s/m) */
+ .G_0 = 3.2f, /* 单腿重力补偿增益 */ .G_1 = 0.0f /* 单腿重力补偿增益 */
 };
 /* USER CODE END PV */
 
@@ -118,6 +103,8 @@ static void MPU_Config(void);
 
 /* Private user code ---------------------------------------------------------*/
 /* USER CODE BEGIN 0 */
+
+
 
 /* USER CODE END 0 */
 
@@ -169,69 +156,68 @@ int main(void)
   HAL_Delay(500);
   P.x = 0.0f;
   P.y = 0.0f;
-  // output_now_0 = -0.46094;
-  // output_now_1 = -2.68065;
-  // output_now_2 = -2.63684;
-  // output_now_3 = -0.46094;
-  // output_now_4 = -0.38362;
-  // output_now_5 = -2.87717;
-  // output_now_6 = -0.38362;
-  // output_now_7 = -2.87717;
 
   joint_param_0.rotor_zero = 0;// 根据实际安装调整零位
-  // joint_param_0.output_zero = -0.46094;// 根据实际安装调整零位
   joint_param_0.output_zero = -2.622;// 根据实际安装调整零位
   joint_param_0.ratio = 6.33f;
   joint_param_0.dir = 1;
 
   joint_param_1.rotor_zero = 0.0f;// 根据实际安装调整零位
-  // joint_param_1.output_zero = -2.68065;// 根据实际安装调整零位
   joint_param_1.output_zero = -0.54070;// 根据实际安装调整零位
   joint_param_1.ratio = 6.33f;
   joint_param_1.dir = -1;
 
   joint_param_2.rotor_zero = 0.0f;// 根据实际转子调整零位
-  // joint_param_2.output_zero = -2.63684;// 根据实际安装调整零位
   joint_param_2.output_zero = -2.622;// 根据实际安装调整零位
   joint_param_2.ratio = 6.33f;
   joint_param_2.dir = -1;
 
   joint_param_3.rotor_zero = 0.0f;// 根据实际转子调整零位
-  // joint_param_3.output_zero = -0.46094;// 根据实际安装调整零位
   joint_param_3.output_zero = -0.54070;// 根据实际安装调整零位
   joint_param_3.ratio = 6.33f;
   joint_param_3.dir = 1;
 
   joint_param_4.rotor_zero = 0.0f;// 根据实际转子调整零位
-  // joint_param_4.output_zero = -0.38362;// 根据实际安装调整零位
   joint_param_4.output_zero = -2.622;// 根据实际安装调整零位
   joint_param_4.ratio = 6.33f;
   joint_param_4.dir = -1;
 
   joint_param_5.rotor_zero = 0.0f;// 根据实际转子调整零位
-  // joint_param_5.output_zero = -2.87717;// 根据实际安装调整零位
   joint_param_5.output_zero = -0.54070;// 根据实际安装调整零位
   joint_param_5.ratio = 6.33f;
   joint_param_5.dir = 1;
 
   joint_param_6.rotor_zero = 0.0f;// 根据实际转子调整零位
-  // joint_param_6.output_zero = -0.38362;// 根据实际安装调整零位
   joint_param_6.output_zero = -0.54070;// 根据实际安装调整零位
   joint_param_6.ratio = 6.33f;
   joint_param_6.dir = -1;
 
   joint_param_7.rotor_zero = 0.0f;// 根据实际转子调整零位
-  // joint_param_7.output_zero = -2.87717;// 根据实际安装调整零位
   joint_param_7.output_zero = -2.622;// 根据实际安装调整零位
   joint_param_7.ratio = 6.33f;
   joint_param_7.dir = 1;
+  
+  foot_motion_0.track.step_length  = 0.060f;
+  foot_motion_0.track.step_height  = 0.025f;
+  foot_motion_0.track.stand_height = -0.150f;
 
-  traj_param.step_length  = 0.060f;
-  traj_param.step_height  = 0.025f;
-  traj_param.stand_height = -0.150f;
-  // traj_param.period       = 0.6f;
-  traj_param.period       = 1.0f;
+  foot_motion_1.track.step_length  = 0.060f;
+  foot_motion_1.track.step_height  = 0.025f;
+  foot_motion_1.track.stand_height = -0.150f;
 
+  foot_motion_2.track.step_length  = 0.060f;
+  foot_motion_2.track.step_height  = 0.025f;
+  foot_motion_2.track.stand_height = -0.150f;
+
+  foot_motion_3.track.step_length  = 0.060f;
+  foot_motion_3.track.step_height  = 0.025f;
+  foot_motion_3.track.stand_height = -0.150f;
+
+  traj_param.period = 1.0f;
+  foot_motion_0.P.x = 0; foot_motion_0.P.y = -0.173f;
+  foot_motion_1.P.x = 0; foot_motion_1.P.y = -0.173f;
+  foot_motion_2.P.x = 0; foot_motion_2.P.y = -0.173f;
+  foot_motion_3.P.x = 0; foot_motion_3.P.y = -0.173f;
   rs485.current_motor = 0;
   rs485.tx_busy = 0;
   rs485.rx_ready = 1;
@@ -243,7 +229,7 @@ int main(void)
   RS485_SetRxTimeout(&rs485, 10U);
   RS485_SetMotorMask(&rs485, RS485_ALL_MOTOR_MASK); // 改这里可选择本次参与读写的电机
   // RS485_SetMotorMask(&rs485, (1U << 0) | (1U << 1)); // 只读写电机0和1
-
+  
   //RS485_1
   cmd_0.id = 0;     cmd_1.id = 1;     cmd_2.id = 2;    cmd_3.id = 3;
   cmd_0.mode = 1;   cmd_1.mode = 1;   cmd_2.mode = 1;  cmd_3.mode = 1;
@@ -274,6 +260,14 @@ int main(void)
     /* USER CODE END WHILE */
 
     /* USER CODE BEGIN 3 */
+    foot_motion_0.Kp_x = kp_x; foot_motion_0.Kd_xt = kd_xt; foot_motion_0.Kd_xr = kd_xr;
+    foot_motion_1.Kp_x = kp_x; foot_motion_1.Kd_xt = kd_xt; foot_motion_1.Kd_xr = kd_xr;
+    foot_motion_2.Kp_x = kp_x; foot_motion_2.Kd_xt = kd_xt; foot_motion_2.Kd_xr = kd_xr;
+    foot_motion_3.Kp_x = kp_x; foot_motion_3.Kd_xt = kd_xt; foot_motion_3.Kd_xr = kd_xr;
+    foot_motion_0.Kp_y = kp_y; foot_motion_0.Kd_yt = kd_yt; foot_motion_0.Kd_yr = kd_yr;
+    foot_motion_1.Kp_y = kp_y; foot_motion_1.Kd_yt = kd_yt; foot_motion_1.Kd_yr = kd_yr;
+    foot_motion_2.Kp_y = kp_y; foot_motion_2.Kd_yt = kd_yt; foot_motion_2.Kd_yr = kd_yr;
+    foot_motion_3.Kp_y = kp_y; foot_motion_3.Kd_yt = kd_yt; foot_motion_3.Kd_yr = kd_yr;
     RS485_Schedule(&rs485);
     // CRSF_Decode();
     CRSF_Key_Get(Key);
@@ -511,7 +505,7 @@ void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim)
                 joint_param_5.output_zero = -0.54070;// 根据实际安装调整零位
                 joint_param_6.output_zero = -0.54070;// 根据实际安装调整零位
                 joint_param_7.output_zero = -2.622;// 根据实际安装调整零位
-                time = 0.0f;
+                time = 0.0f;     
                 flag_1 = 2;
             }
         }
@@ -520,10 +514,35 @@ void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim)
             if((run == 1))
             {   
                 last_speed_state = speed_state;
-                if(speed>=1100) {traj_param.period = 0.25f;traj_param.step_length  = 0.100f;speed_state = 3;}
-                else if(speed<1100 && speed >= 400) {traj_param.period = 0.3f; traj_param.step_length  = 0.100f;speed_state = 2;}
-                else if(speed<400 && speed >=0) {traj_param.period = 0.4f; traj_param.step_length  = 0.100f; speed_state = 1;}
-                if(last_speed_state!= speed_state) {R_time = 0.0f; F_time = 0.0f; time = 0.0f;}
+                if(speed>=1100) 
+                {
+                  foot_motion_0.track.step_length  = 0.100f;
+                  foot_motion_1.track.step_length  = 0.100f;
+                  foot_motion_2.track.step_length  = 0.100f;
+                  foot_motion_3.track.step_length  = 0.100f;
+                  traj_param.period = 0.25f;
+                  speed_state = 3;
+                }
+                else if(speed<1100 && speed >= 400) 
+                {
+                  foot_motion_0.track.step_length  = 0.100f;
+                  foot_motion_1.track.step_length  = 0.100f;
+                  foot_motion_2.track.step_length  = 0.100f;
+                  foot_motion_3.track.step_length  = 0.100f;
+                  traj_param.period = 0.3f;
+                  speed_state = 2;
+                }
+                else if(speed<400 && speed >=0) 
+                {
+                  foot_motion_0.track.step_length  = 0.100f; 
+                  foot_motion_1.track.step_length  = 0.100f; 
+                  foot_motion_2.track.step_length  = 0.100f; 
+                  foot_motion_3.track.step_length  = 0.100f; 
+                  traj_param.period = 0.4f;
+                  speed_state = 1;
+                }
+                apply_curve_step_length(go_dir, foot_motion_0.track.step_length, inner_ratio);
+                if(last_speed_state!= speed_state) {time = 0.0f;}
                 if(control_mode == 0 || control_mode == 2)
                 {
                   if(mode == 1)
@@ -540,126 +559,68 @@ void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim)
                   }
                   if(mode == 2)
                   {
-                      if(go_dir == 1) 
+                      if(go_dir == 1 || go_dir == 5 || go_dir == 6||go_dir == 3 || go_dir == 4) 
                       {
                         time += dt; 
                         if(time > traj_param.period) time -= traj_param.period;
                         else if(time < 0) time += traj_param.period;
                       }//前进             
-                      else if(go_dir == 2) 
+                      else if(go_dir == 2 || go_dir == 7 || go_dir == 8) 
                       {
                         time -= dt;
                         if(time > traj_param.period) time -= traj_param.period;
                         else if(time < 0) time += traj_param.period;
-                        // if(temp_t > traj_param.period) temp_t -= traj_param.period;
-                        // else if(time < 0) time += traj_param.period;
-                        // time = traj_param.period-temp_t; 
                       }//后退
-                      else if(go_dir == 3) 
+                      if(go_dir == 1 || go_dir == 2 || (go_dir >= 5 && go_dir <= 8))
                       {
-                        F_time += dt;
-                        R_time -= dt;
-                        
-                        if(F_time > traj_param.period) F_time -= traj_param.period;
-                        else if(F_time < 0) F_time += traj_param.period;
-                        if(R_time > traj_param.period) R_time -= traj_param.period;
-                        else if(R_time < 0) R_time += traj_param.period;
-                      }//原地右转
-                      else if(go_dir == 4) 
-                      {
-                        F_time -= dt;
-                        R_time += dt;
-                        
-                        if(F_time > traj_param.period) F_time -= traj_param.period;
-                        else if(F_time < 0) F_time += traj_param.period;
-                        if(R_time > traj_param.period) R_time -= traj_param.period;
-                        else if(R_time < 0) R_time += traj_param.period;
-                      }//原地左转
-                      if(go_dir == 1 || go_dir == 2)
-                      {
-                        foot_ellipse_trajectory(time, &traj_param, &foot_motion_0.P.x, &foot_motion_0.P.y);  //0，2
-                        
-                        if(fivebar_inverse(foot_motion_0.P.x, foot_motion_0.P.y, &theta0_out, &theta1_out, true))//左前腿和右后腿 0，1，4，5
-                        {
-                          go_0_pos= theta1_out;
-                          go_1_pos =theta0_out;
-                          
-                          go_4_pos = theta1_out;                   
-                          go_5_pos = theta0_out; 
-              
-                          cmd_0.Pos = output_to_rotor(go_0_pos, &joint_param_0); PosPID_UpdateCmd(&cmd_0, go_0_pos, &Pospid[0]);//正向                        
-                  
-                          cmd_1.Pos = output_to_rotor(go_1_pos, &joint_param_1); PosPID_UpdateCmd(&cmd_1, go_1_pos, &Pospid[1]);//正向   
-
-                          cmd_4.Pos = output_to_rotor(go_4_pos, &joint_param_4); PosPID_UpdateCmd(&cmd_4, go_4_pos, &Pospid[4]);//正向                    
-                        
-                          cmd_5.Pos = output_to_rotor(go_5_pos, &joint_param_5); PosPID_UpdateCmd(&cmd_5, go_5_pos, &Pospid[5]);//正向
-                        }
-
-                        foot_ellipse_trajectory((time+traj_param.period/2.0f), &traj_param, &foot_motion_1.P.x, &foot_motion_1.P.y); //1，3
-                        if(fivebar_inverse(foot_motion_1.P.x, foot_motion_1.P.y, &theta0_out, &theta1_out, true))//左后腿和右前腿 2，3，6，7   
-                        {
-                          go_2_pos = theta1_out; 
-                          go_3_pos = theta0_out; 
-                          
-                          go_7_pos = theta1_out;
-                          go_6_pos = theta0_out;  
-                          // cmd_2.Pos = output_to_rotor((PI-theta0_out), &joint_param_2); PosPID_UpdateCmd(&cmd_2, (PI-theta0_out), &Pospid[2]); //反向                  
-                          cmd_2.Pos = output_to_rotor(go_2_pos, &joint_param_2);      PosPID_UpdateCmd(&cmd_2, go_2_pos, &Pospid[2]); //正向  
-                          
-                          // cmd_3.Pos = output_to_rotor(theta1_out, &joint_param_3);      PosPID_UpdateCmd(&cmd_3, theta1_out, &Pospid[3]);//反向            
-                          cmd_3.Pos = output_to_rotor(go_3_pos, &joint_param_3); PosPID_UpdateCmd(&cmd_3, go_3_pos, &Pospid[3]);//正向 
-
-                          // cmd_7.Pos = output_to_rotor(theta0_out, &joint_param_7);      PosPID_UpdateCmd(&cmd_7, theta0_out, &Pospid[7]);//反向                   
-                          cmd_7.Pos = output_to_rotor(go_7_pos, &joint_param_7); PosPID_UpdateCmd(&cmd_7, go_7_pos, &Pospid[7]);//正向             
-                  
-                          // cmd_6.Pos = output_to_rotor((PI-theta1_out), &joint_param_6); PosPID_UpdateCmd(&cmd_6, (PI-theta1_out), &Pospid[6]);//反向             
-                          cmd_6.Pos = output_to_rotor(go_6_pos, &joint_param_6);      PosPID_UpdateCmd(&cmd_6, go_6_pos, &Pospid[6]);//正向
-                        }
+                        foot_ellipse_trajectory(time, &foot_motion_0, &traj_param);  //左前
+                        foot_ellipse_trajectory((time+traj_param.period/2.0f), &foot_motion_1, &traj_param); //右前
+                        foot_ellipse_trajectory(time, &foot_motion_2, &traj_param);  //2右后
+                        foot_ellipse_trajectory((time+traj_param.period/2.0f), &foot_motion_3, &traj_param); //3左后
                       }
-                      if(go_dir == 3 || go_dir == 4)
+                      if(go_dir == 3)
                       {
-                        
-                        foot_ellipse_trajectory(F_time, &traj_param, &foot_motion_0.P.x, &foot_motion_0.P.y);                        
-                        if(fivebar_inverse(foot_motion_0.P.x, foot_motion_0.P.y, &theta0_out, &theta1_out, true))//左前腿 0，1
-                        {
-                          go_0_pos = theta1_out;
-                          go_1_pos = theta0_out;
-
-                          cmd_0.Pos = output_to_rotor(go_0_pos, &joint_param_0); PosPID_UpdateCmd(&cmd_0, (PI-theta1_out), &Pospid[0]);//正向
-                          cmd_1.Pos = output_to_rotor(go_1_pos, &joint_param_1); PosPID_UpdateCmd(&cmd_1, theta0_out, &Pospid[1]);//正向
-                        }
-
-                        foot_ellipse_trajectory(R_time+traj_param.period/2.0f, &traj_param, &foot_motion_1.P.x, &foot_motion_1.P.y);  
-                        if(fivebar_inverse(foot_motion_1.P.x, foot_motion_1.P.y, &theta0_out, &theta1_out, true))//右后腿 4，5
-                        {
-                          go_4_pos = theta1_out;                
-                          go_5_pos = theta0_out; 
-                    
-                          cmd_4.Pos = output_to_rotor(go_4_pos, &joint_param_4); PosPID_UpdateCmd(&cmd_4, (PI-theta0_out), &Pospid[4]);//反向                 
-                          cmd_5.Pos = output_to_rotor(go_5_pos, &joint_param_5); PosPID_UpdateCmd(&cmd_5, theta1_out, &Pospid[5]);//反向                    
-                        }
-
-                        foot_ellipse_trajectory((F_time+traj_param.period/2.0f), &traj_param, &foot_motion_2.P.x, &foot_motion_2.P.y);
-                        if(fivebar_inverse(foot_motion_2.P.x, foot_motion_2.P.y, &theta0_out, &theta1_out, true))//左后腿 6，7  
-                        {                       
-                          go_7_pos=  theta1_out;
-                          go_6_pos = theta0_out;  
-            
-                          cmd_6.Pos = output_to_rotor(go_6_pos, &joint_param_6); PosPID_UpdateCmd(&cmd_6, theta0_out, &Pospid[6]);//正向                  
-                          cmd_7.Pos = output_to_rotor(go_7_pos, &joint_param_7); PosPID_UpdateCmd(&cmd_7, (PI-theta1_out), &Pospid[7]);//正向                            
-                        } 
-
-                        foot_ellipse_trajectory((R_time), &traj_param, &foot_motion_3.P.x, &foot_motion_3.P.y);
-                        if(fivebar_inverse(foot_motion_3.P.x, foot_motion_3.P.y, &theta0_out, &theta1_out, true))//右前腿 2，3，  
-                        {
-                          go_2_pos = theta1_out; 
-                          go_3_pos = theta0_out; 
-
-                          cmd_2.Pos = output_to_rotor(go_2_pos, &joint_param_2); PosPID_UpdateCmd(&cmd_2, (PI-theta0_out), &Pospid[2]); //反向                  
-                          cmd_3.Pos = output_to_rotor(go_3_pos, &joint_param_3); PosPID_UpdateCmd(&cmd_3, theta1_out, &Pospid[3]);//反向
-                        }                        
-                      }             
+                        foot_ellipse_trajectory_dir(time, &foot_motion_0, &traj_param, 1.0f);
+                        foot_ellipse_trajectory_dir((time+traj_param.period/2.0f), &foot_motion_1, &traj_param, -1.0f); 
+                        foot_ellipse_trajectory_dir(time, &foot_motion_2, &traj_param, -1.0f);
+                        foot_ellipse_trajectory_dir((time+traj_param.period/2.0f), &foot_motion_3, &traj_param, 1.0f);                                                                       
+                      }
+                      else if(go_dir == 4)
+                      {
+                        foot_ellipse_trajectory_dir(time, &foot_motion_0, &traj_param, -1.0f);
+                        foot_ellipse_trajectory_dir((time+traj_param.period/2.0f), &foot_motion_1, &traj_param, 1.0f); 
+                        foot_ellipse_trajectory_dir(time, &foot_motion_2, &traj_param, 1.0f);
+                        foot_ellipse_trajectory_dir((time+traj_param.period/2.0f), &foot_motion_3, &traj_param, -1.0f);                                                                       
+                      }  
+                      if(fivebar_inverse(foot_motion_0.P.x, foot_motion_0.P.y, &theta0_out, &theta1_out, true))//左前腿 0，1
+                      {
+                        go_0_pos = theta1_out;
+                        go_1_pos = theta0_out;
+                        cmd_0.Pos = output_to_rotor(go_0_pos, &joint_param_0); PosPID_UpdateCmd(&cmd_0, (PI-theta1_out), &Pospid[0]);//正向
+                        cmd_1.Pos = output_to_rotor(go_1_pos, &joint_param_1); PosPID_UpdateCmd(&cmd_1, theta0_out, &Pospid[1]);//正向
+                      }
+                      if(fivebar_inverse(foot_motion_1.P.x, foot_motion_1.P.y, &theta0_out, &theta1_out, true))//右前腿 2，3，  
+                      {
+                        go_2_pos = theta1_out; 
+                        go_3_pos = theta0_out; 
+                        cmd_2.Pos = output_to_rotor(go_2_pos, &joint_param_2); PosPID_UpdateCmd(&cmd_2, (PI-theta0_out), &Pospid[2]); //反向                  
+                        cmd_3.Pos = output_to_rotor(go_3_pos, &joint_param_3); PosPID_UpdateCmd(&cmd_3, theta1_out, &Pospid[3]);//反向
+                      }   
+                      if(fivebar_inverse(foot_motion_2.P.x, foot_motion_2.P.y, &theta0_out, &theta1_out, true))//右后腿 4，5
+                      {
+                        go_4_pos = theta1_out;                
+                        go_5_pos = theta0_out;                  
+                        cmd_4.Pos = output_to_rotor(go_4_pos, &joint_param_4); PosPID_UpdateCmd(&cmd_4, (PI-theta0_out), &Pospid[4]);//反向                 
+                        cmd_5.Pos = output_to_rotor(go_5_pos, &joint_param_5); PosPID_UpdateCmd(&cmd_5, theta1_out, &Pospid[5]);//反向                    
+                      }                 
+                      if(fivebar_inverse(foot_motion_3.P.x, foot_motion_3.P.y, &theta0_out, &theta1_out, true))//左后腿 6，7  
+                      {                       
+                        go_7_pos=  theta1_out;
+                        go_6_pos = theta0_out;           
+                        cmd_6.Pos = output_to_rotor(go_6_pos, &joint_param_6); PosPID_UpdateCmd(&cmd_6, theta0_out, &Pospid[6]);//正向                  
+                        cmd_7.Pos = output_to_rotor(go_7_pos, &joint_param_7); PosPID_UpdateCmd(&cmd_7, (PI-theta1_out), &Pospid[7]);//正向                            
+                      }     
+                               
                   }
                 }
                 else if (control_mode == 1) 
@@ -702,40 +663,18 @@ void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim)
                   }
                   if(mode == 2)
                   {
-                    if(go_dir == 1) 
+                    if(go_dir == 1 || go_dir == 5 || go_dir == 6||go_dir == 3 || go_dir == 4) 
                     {
                       time += dt; 
                       if(time > traj_param.period) time -= traj_param.period;
                       else if(time < 0) time += traj_param.period;
                     }//前进             
-                    else if(go_dir == 2) 
+                    else if(go_dir == 2 || go_dir == 7 || go_dir == 8) 
                     {
                       time -= dt;
                       if(time > traj_param.period) time -= traj_param.period;
                       else if(time < 0) time += traj_param.period;
-                      // if(temp_t > traj_param.period) temp_t -= traj_param.period;
-                      // else if(time < 0) time += traj_param.period;
-                      // time = traj_param.period-temp_t; 
                     }//后退
-                    else if(go_dir == 3) 
-                    {
-                      F_time += dt;
-                      R_time -= dt;                     
-                      if(F_time > traj_param.period) F_time -= traj_param.period;
-                      else if(F_time < 0) F_time += traj_param.period;
-                      if(R_time > traj_param.period) R_time -= traj_param.period;
-                      else if(R_time < 0) R_time += traj_param.period;
-                    }//原地右转
-                    else if(go_dir == 4) 
-                    {
-                      F_time -= dt;
-                      R_time += dt;
-                        
-                      if(F_time > traj_param.period) F_time -= traj_param.period;
-                      else if(F_time < 0) F_time += traj_param.period;
-                      if(R_time > traj_param.period) R_time -= traj_param.period;
-                      else if(R_time < 0) R_time += traj_param.period;
-                    }//原地左转
                     if(time> traj_param.period/2.0f && time < traj_param.period) 
                     {
                       foot_motion_0.motion_state = 1; 
@@ -754,17 +693,27 @@ void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim)
                     if(foot_motion_1.motion_state == 0) foot_motion_1.G_1 = G_1; else foot_motion_1.G_1 = 0.0f;
                     if(foot_motion_2.motion_state == 0) foot_motion_2.G_1 = G_2; else foot_motion_2.G_1 = 0.0f;
                     if(foot_motion_3.motion_state == 0) foot_motion_3.G_1 = G_3; else foot_motion_3.G_1 = 0.0f;
-                    if(go_dir == 1 || go_dir == 2)
+                    if(go_dir == 1 || go_dir == 2 || (go_dir >= 5 && go_dir <= 8))
                     {
-                      foot_ellipse_trajectory(time, &traj_param, &foot_motion_0.P.x, &foot_motion_0.P.y);
-                      foot_ellipse_trajectory(time+traj_param.period/2.0f, &traj_param, &foot_motion_1.P.x, &foot_motion_1.P.y);
-                      foot_ellipse_trajectory(time, &traj_param, &foot_motion_2.P.x, &foot_motion_2.P.y);
-                      foot_ellipse_trajectory(time+traj_param.period/2.0f, &traj_param, &foot_motion_3.P.x, &foot_motion_3.P.y);
+                      foot_ellipse_trajectory(time, &foot_motion_0, &traj_param);
+                      foot_ellipse_trajectory(time+traj_param.period/2.0f, &foot_motion_1, &traj_param);
+                      foot_ellipse_trajectory(time, &foot_motion_2, &traj_param);
+                      foot_ellipse_trajectory(time+traj_param.period/2.0f, &foot_motion_3, &traj_param);
                     }
-                    // foot_motion_0.P.x = target_x; foot_motion_0.P.y = target_y;
-                    // foot_motion_1.P.x = target_x; foot_motion_1.P.y = target_y;
-                    // foot_motion_2.P.x = target_x; foot_motion_2.P.y = target_y;
-                    // foot_motion_3.P.x = target_x; foot_motion_3.P.y = target_y;
+                    else if(go_dir == 3)
+                    {
+                      foot_ellipse_trajectory_dir(time, &foot_motion_0, &traj_param, 1.0f);
+                      foot_ellipse_trajectory_dir(time+traj_param.period/2.0f, &foot_motion_1, &traj_param, -1.0f);
+                      foot_ellipse_trajectory_dir(time, &foot_motion_2, &traj_param, -1.0f);
+                      foot_ellipse_trajectory_dir(time+traj_param.period/2.0f, &foot_motion_3, &traj_param, 1.0f);
+                    }
+                    else if(go_dir == 4)
+                    {
+                      foot_ellipse_trajectory_dir(time, &foot_motion_0, &traj_param, -1.0f);
+                      foot_ellipse_trajectory_dir(time+traj_param.period/2.0f, &foot_motion_1, &traj_param, 1.0f);
+                      foot_ellipse_trajectory_dir(time, &foot_motion_2, &traj_param, 1.0f);
+                      foot_ellipse_trajectory_dir(time+traj_param.period/2.0f, &foot_motion_3, &traj_param, -1.0f);
+                    }
                     // 计算期望足端速度 (对目标轨迹求导)
                     foot_motion_0.target_vx =  (foot_motion_0.P.x - foot_motion_0.last_P.x) / dt;
                     foot_motion_0.target_vy =  (foot_motion_0.P.y - foot_motion_0.last_P.y) / dt;

@@ -30,9 +30,13 @@ void COM_GetData(uint8_t *go_dir)
 {
     switch_speed = (int16_t)(COM_UART_RxData[10] << 8 | COM_UART_RxData[9]);
     go_speed = (int16_t)( (uint8_t)COM_UART_RxData[6] << 8 | (uint8_t)COM_UART_RxData[5] );
-    if(switch_speed > 0) *go_dir = 3; // Turn left
-    else if(switch_speed < 0) *go_dir = 4; // Turn right
-    else if(go_speed > 0) *go_dir = 1; // Forward
-    else if(go_speed < 0) *go_dir = 2; // Backward
+    if(switch_speed > 0 && go_speed == 0) *go_dir = 3; // Turn left
+    else if(switch_speed < 0 && go_speed == 0) *go_dir = 4; // Turn right
+    if(go_speed > 0 && switch_speed == 0) *go_dir = 1; // Forward
+    else if(go_speed < 0 && switch_speed == 0) *go_dir = 2; // Backward
+    if(go_speed > 0 && switch_speed > 0) *go_dir = 5; // Forward right
+    else if(go_speed > 0 && switch_speed < 0) *go_dir = 6; // Forward left
+    if(go_speed < 0 && switch_speed > 0) *go_dir = 7; // Backward right
+    else if(go_speed < 0 && switch_speed < 0) *go_dir = 8; // Backward left
     else *go_dir = 0; // Stop
 }
