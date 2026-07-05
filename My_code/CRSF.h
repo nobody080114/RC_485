@@ -8,6 +8,6 @@ void CRSF_AcceptData(void);
 void CRSF_Decode(void);
 uint16_t CRSF_GetData(uint8_t Channelx);
 void CRSF_Key_Get(uint16_t *key);
-
+void CRSF_Schedule(void);
 #endif
 

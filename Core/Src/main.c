@@ -48,7 +48,6 @@
 // 速度低通滤波器参数 (截止频率约 30~50Hz)
 // alpha 越小滤波越强，但延迟越大；alpha 越大越灵敏，但噪声越大。
 #define VEL_ALPHA 0.2f 
-
 RS485_Scheduler_t rs485;
 FootTrajParam traj_param;
 Point2D P,current_P;
@@ -58,7 +57,7 @@ float G_0 = -72.0F,G_1 = -72.0f,G_2 = -68.0f,G_3 = -68.0f;
 float time = 0.0f,dt = 0.001f;
 float theta0_out = 0, theta1_out = 0;
 float go_0_pos=0,go_1_pos=0,go_2_pos=0,go_3_pos=0,go_4_pos=0,go_5_pos=0,go_6_pos=0,go_7_pos=0;
-int8_t start = 0,start_1 = 0,run  = 0,flag_1 = 1,mode = 0,control_mode = 0,Enable = 0,go_dir = 0,stand_state = 0;
+int8_t start = 0,start_1 = 0,run  = 0,flag_1 = 1,stand_flag = 0,mode = 0,last_mode = 0,control_mode = 0,Enable = 0,go_dir = 0,stand_state = 0;
 // go_dir: 1-forward, 2-backward, 3-turn right, 4-turn left,
 //         5-forward right, 6-forward left, 7-backward right, 8-backward left
 //go_dir: 1-前进，2-后退，3-左移，4-右移
@@ -72,24 +71,24 @@ Filter2ndState filter_w1 = {0};
 Filter2ndState filter_w2 = {0};
 Foot_motion foot_motion_0 = {
  .Kp_x = 400, /* X方向的比例增益 (N/m) */ .Kd_xt = 25,  /* X轴前馈阻尼系数 (N·s/m) */ .Kd_xr = 20,  /* X轴反馈阻尼系数 (N·s/m)*/
- .Kp_y = 1000,/* Y方向的比例增益 (N/m) */ .Kd_yt = 115,  /* Y轴前馈阻尼系数 (N·s/m)  */  .Kd_yr = 87,  /* Y轴反馈阻尼系数 (N·s/m) */
+ .Kp_y = 2000,/* Y方向的比例增益 (N/m) */ .Kd_yt = 115,  /* Y轴前馈阻尼系数 (N·s/m)  */  .Kd_yr = 87,  /* Y轴反馈阻尼系数 (N·s/m) */
  .G_0 = 3.2f, /* 单腿重力补偿增益 */ .G_1 = 0.0f /* 单腿重力补偿增益 */ 
 };
 
 Foot_motion foot_motion_1 = {
  .Kp_x = 400, /* X方向的比例增益 (N/m) */ .Kd_xt = 25,  /* X轴前馈阻尼系数 (N·s/m) */ .Kd_xr = 20,  /* X轴反馈阻尼系数 (N·s/m)*/
- .Kp_y = 1000,/* Y方向的比例增益 (N/m) */ .Kd_yt = 115,  /* Y轴前馈阻尼系数 (N·s/m)  */  .Kd_yr = 87,  /* Y轴反馈阻尼系数 (N·s/m) */
+ .Kp_y = 2000,/* Y方向的比例增益 (N/m) */ .Kd_yt = 115,  /* Y轴前馈阻尼系数 (N·s/m)  */  .Kd_yr = 87,  /* Y轴反馈阻尼系数 (N·s/m) */
  .G_0 = 3.2f, /* 单腿重力补偿增益 */ .G_1 = 0.0f /* 单腿重力补偿增益 */
 };
 
 Foot_motion foot_motion_2 = {
  .Kp_x = 400, /* X方向的比例增益 (N/m) */ .Kd_xt = 25,  /* X轴前馈阻尼系数 (N·s/m) */ .Kd_xr = 20,  /* X轴反馈阻尼系数 (N·s/m)*/
- .Kp_y = 1000,/* Y方向的比例增益 (N/m) */ .Kd_yt = 115,  /* Y轴前馈阻尼系数 (N·s/m)  */  .Kd_yr = 87,  /* Y轴反馈阻尼系数 (N·s/m) */
+ .Kp_y = 2000,/* Y方向的比例增益 (N/m) */ .Kd_yt = 115,  /* Y轴前馈阻尼系数 (N·s/m)  */  .Kd_yr = 87,  /* Y轴反馈阻尼系数 (N·s/m) */
  .G_0 = 3.2f, /* 单腿重力补偿增益 */ .G_1 = 0.0f /* 单腿重力补偿增益 */
 };
 Foot_motion foot_motion_3 = {
  .Kp_x = 400, /* X方向的比例增益 (N/m) */ .Kd_xt = 25,  /* X轴前馈阻尼系数 (N·s/m) */ .Kd_xr = 20,  /* X轴反馈阻尼系数 (N·s/m)*/
- .Kp_y = 1000,/* Y方向的比例增益 (N/m) */ .Kd_yt = 115,  /* Y轴前馈阻尼系数 (N·s/m)  */  .Kd_yr = 87,  /* Y轴反馈阻尼系数 (N·s/m) */
+ .Kp_y = 2000,/* Y方向的比例增益 (N/m) */ .Kd_yt = 115,  /* Y轴前馈阻尼系数 (N·s/m)  */  .Kd_yr = 87,  /* Y轴反馈阻尼系数 (N·s/m) */
  .G_0 = 3.2f, /* 单腿重力补偿增益 */ .G_1 = 0.0f /* 单腿重力补偿增益 */
 };
 /* USER CODE END PV */
@@ -103,8 +102,6 @@ static void MPU_Config(void);
 
 /* Private user code ---------------------------------------------------------*/
 /* USER CODE BEGIN 0 */
-
-
 
 /* USER CODE END 0 */
 
@@ -249,8 +246,7 @@ int main(void)
   HAL_TIM_Base_Start_IT(&htim1); // 启动定时器1的中断，定时器1的周期由cubemx设置，这里是1ms
   CRSF_Init();
   COM_UART_Init();
-  // HAL_UART_Receive_IT(&huart1, (uint8_t *)com_rx_data, 14);
-  // HAL_UART_Receive_IT(&huart5, (uint8_t *)pData, 26);
+
   /* USER CODE END 2 */
 
   /* Infinite loop */
@@ -269,29 +265,7 @@ int main(void)
     foot_motion_2.Kp_y = kp_y; foot_motion_2.Kd_yt = kd_yt; foot_motion_2.Kd_yr = kd_yr;
     foot_motion_3.Kp_y = kp_y; foot_motion_3.Kd_yt = kd_yt; foot_motion_3.Kd_yr = kd_yr;
     RS485_Schedule(&rs485);
-    // CRSF_Decode();
-    CRSF_Key_Get(Key);
-    if(control_mode == 0 || control_mode == 1)
-    {
-      if(Key[1] >= 1200 && Key[0]>=800 && Key[0]<=1200) go_dir = 1; //前进拨键
-      else if(Key[1] <= 800 && Key[0]>=800 && Key[0]<=1200) go_dir = 2; //后退拨键
-      else if(Key[0] >= 1200 && Key[1]>=800 && Key[1]<=1200) go_dir = 3;//原地右转拨键
-      else if(Key[0] <= 800 && Key[1]>=800 && Key[1]<=1200) go_dir = 4;//原地左转拨键
-      else if (Key[0] >= 1200 && Key[1]>=1200) go_dir = 5;//右前斜移拨键
-      else if (Key[0] <= 800 && Key[1]>=1200) go_dir = 6;//左前斜移拨键
-      else if (Key[0] >= 1200 && Key[1]<=800) go_dir = 7;//右后斜移拨键
-      else if (Key[0] <= 800 && Key[1]<=800) go_dir = 8;//左后斜移拨键
-      else go_dir = 0;//停
-    }
-    if(run == 1) speed = Key[2]-174; else speed = 0;//左拨杆
-    
-    if(Key[7] == 1792) run = 1; else run = 0;///右按键
-    if(Key[8] == 1792) start_1 = 1; else start_1 = 0;//左上长按键
-    if(Key[4] == 1792) Enable = 1; else Enable = 0;//左按键
-    if(Key[5] == 191) mode = 1; else if(Key[5] == 997) mode = 2; else if(Key[5] == 1792) mode = 3;//左拨键
-    // if(Key[9]<800) stand_state = 0; else if(Key[9]<1300 && Key[9]>=800) stand_state = 1; else stand_state = 2;//右上长按键
-    if(Key[6] == 191) control_mode = 0; else if(Key[6] == 997) control_mode = 1; else if(Key[6] == 1792) control_mode = 2;//右拨键 //0-位控，1-力控，2-自动控制
-    
+    CRSF_Schedule();
     if(Enable)
     {
         if(flag_1 == 1)
@@ -543,8 +517,9 @@ void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim)
                 }
                 apply_curve_step_length(go_dir, foot_motion_0.track.step_length, inner_ratio);
                 if(last_speed_state!= speed_state) {time = 0.0f;}
+                // if(last_mode == 1 && mode == 2) {stand_flag = 2;}
                 if(control_mode == 0 || control_mode == 2)
-                {
+                {                                  
                   if(mode == 1)
                   {
                     cmd_0.Pos = output_to_rotor(-PI, &joint_param_0); PosPID_UpdateCmd(&cmd_0, 0, &Pospid[0]);
@@ -556,6 +531,7 @@ void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim)
                     cmd_6.Pos = output_to_rotor(0, &joint_param_6); PosPID_UpdateCmd(&cmd_6, -2*PI, &Pospid[6]);
                     cmd_7.Pos = output_to_rotor(-PI, &joint_param_7); PosPID_UpdateCmd(&cmd_7, 0, &Pospid[7]);
                     time = 0.0f;
+                    // stand_flag = 1;
                   }
                   if(mode == 2)
                   {
@@ -650,6 +626,10 @@ void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim)
                   foot_motion_3.omega2 = data_7.W * joint_param_7.dir / joint_param_7.ratio;
                   foot_motion_3.now_tau1 = data_6.T * joint_param_6.dir * joint_param_6.ratio;
                   foot_motion_3.now_tau2 = data_7.T * joint_param_7.dir * joint_param_7.ratio;
+                  if(mode != 3)
+                  {
+                    jump_reset();
+                  }
                   if(mode == 1)
                   {
                     foot_motion_0.G_1 = -25.0f;
@@ -732,14 +712,22 @@ void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim)
                     foot_motion_3.last_P.x = foot_motion_3.P.x;
                     foot_motion_3.last_P.y = foot_motion_3.P.y;             
                   }
+                  if(mode == 3)
+                  {
+                    foot_motion_0.G_1 = 0.0f;
+                    foot_motion_1.G_1 = 0.0f;
+                    foot_motion_2.G_1 = 0.0f;
+                    foot_motion_3.G_1 = 0.0f;
+                    jump_update(dt);           
+                  }
                   if(fwd_kinematics_and_jacobian(foot_motion_0.output_now_1, foot_motion_0.output_now_0, true, &foot_motion_0.current_P, &foot_motion_0.J)) 
                   {
                     foot_motion_0.raw_vx = foot_motion_0.J.J00 * foot_motion_0.omega1 + foot_motion_0.J.J01 * foot_motion_0.omega2;
                     foot_motion_0.raw_vy = foot_motion_0.J.J10 * foot_motion_0.omega1 + foot_motion_0.J.J11 * foot_motion_0.omega2;
                     foot_motion_0.filtered_vx = VEL_ALPHA * foot_motion_0.raw_vx + (1.0f - VEL_ALPHA) * foot_motion_0.filtered_vx;
                     foot_motion_0.filtered_vy = VEL_ALPHA * foot_motion_0.raw_vy + (1.0f - VEL_ALPHA) * foot_motion_0.filtered_vy;
-                    foot_motion_0.Fx = foot_motion_0.Kp_x * (foot_motion_0.P.x - foot_motion_0.current_P.x)+ foot_motion_0.Kd_xt * foot_motion_0.target_vx - foot_motion_0.Kd_xr*foot_motion_0.filtered_vx;
-                    foot_motion_0.Fy = foot_motion_0.G_1 + foot_motion_0.G_0 + foot_motion_0.Kp_y * (foot_motion_0.P.y - foot_motion_0.current_P.y)+ foot_motion_0.Kd_yt * foot_motion_0.target_vy - foot_motion_0.Kd_yr*foot_motion_0.filtered_vy;
+                    foot_motion_0.Fx = jump_ff_x + foot_motion_0.Kp_x * (foot_motion_0.P.x - foot_motion_0.current_P.x)+ foot_motion_0.Kd_xt * foot_motion_0.target_vx - foot_motion_0.Kd_xr*foot_motion_0.filtered_vx;
+                    foot_motion_0.Fy = jump_ff_y + foot_motion_0.G_1 + foot_motion_0.G_0 + foot_motion_0.Kp_y * (foot_motion_0.P.y - foot_motion_0.current_P.y)+ foot_motion_0.Kd_yt * foot_motion_0.target_vy - foot_motion_0.Kd_yr*foot_motion_0.filtered_vy;
                     foot_motion_0.target_tau1 = (foot_motion_0.J.J00 * foot_motion_0.Fx + foot_motion_0.J.J10 * foot_motion_0.Fy)* joint_param_1.dir / joint_param_1.ratio;
                     foot_motion_0.target_tau2 = (foot_motion_0.J.J01 * foot_motion_0.Fx + foot_motion_0.J.J11 * foot_motion_0.Fy)* joint_param_0.dir / joint_param_0.ratio;
                     estimate_foot_force(foot_motion_0.now_tau1, foot_motion_0.now_tau2, &foot_motion_0.J, &foot_motion_0.Fx_real, &foot_motion_0.Fy_real);
@@ -755,8 +743,8 @@ void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim)
                     foot_motion_1.raw_vy = foot_motion_1.J.J10 * foot_motion_1.omega1 + foot_motion_1.J.J11 * foot_motion_1.omega2;
                     foot_motion_1.filtered_vx = VEL_ALPHA * foot_motion_1.raw_vx + (1.0f - VEL_ALPHA) * foot_motion_1.filtered_vx;
                     foot_motion_1.filtered_vy = VEL_ALPHA * foot_motion_1.raw_vy + (1.0f - VEL_ALPHA) * foot_motion_1.filtered_vy;
-                    foot_motion_1.Fx = foot_motion_1.Kp_x * (foot_motion_1.P.x - foot_motion_1.current_P.x)+ foot_motion_1.Kd_xt * foot_motion_1.target_vx - foot_motion_1.Kd_xr*foot_motion_1.filtered_vx;
-                    foot_motion_1.Fy = foot_motion_1.G_1 + foot_motion_1.G_0 + foot_motion_1.Kp_y * (foot_motion_1.P.y - foot_motion_1.current_P.y)+ foot_motion_1.Kd_yt * foot_motion_1.target_vy - foot_motion_1.Kd_yr*foot_motion_1.filtered_vy;
+                    foot_motion_1.Fx = jump_ff_x + foot_motion_1.Kp_x * (foot_motion_1.P.x - foot_motion_1.current_P.x)+ foot_motion_1.Kd_xt * foot_motion_1.target_vx - foot_motion_1.Kd_xr*foot_motion_1.filtered_vx;
+                    foot_motion_1.Fy = jump_ff_y + foot_motion_1.G_1 + foot_motion_1.G_0 + foot_motion_1.Kp_y * (foot_motion_1.P.y - foot_motion_1.current_P.y)+ foot_motion_1.Kd_yt * foot_motion_1.target_vy - foot_motion_1.Kd_yr*foot_motion_1.filtered_vy;
                     foot_motion_1.target_tau1 = (foot_motion_1.J.J00 * foot_motion_1.Fx + foot_motion_1.J.J10 * foot_motion_1.Fy)* joint_param_3.dir / joint_param_3.ratio;
                     foot_motion_1.target_tau2 = (foot_motion_1.J.J01 * foot_motion_1.Fx + foot_motion_1.J.J11 * foot_motion_1.Fy)* joint_param_2.dir / joint_param_2.ratio;
                     estimate_foot_force(foot_motion_1.now_tau1, foot_motion_1.now_tau2, &foot_motion_1.J, &foot_motion_1.Fx_real, &foot_motion_1.Fy_real);
@@ -772,8 +760,8 @@ void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim)
                     foot_motion_2.raw_vy = foot_motion_2.J.J10 * foot_motion_2.omega1 + foot_motion_2.J.J11 * foot_motion_2.omega2;
                     foot_motion_2.filtered_vx = VEL_ALPHA * foot_motion_2.raw_vx + (1.0f - VEL_ALPHA) * foot_motion_2.filtered_vx;
                     foot_motion_2.filtered_vy = VEL_ALPHA * foot_motion_2.raw_vy + (1.0f - VEL_ALPHA) * foot_motion_2.filtered_vy;
-                    foot_motion_2.Fx = foot_motion_2.Kp_x * (foot_motion_2.P.x - foot_motion_2.current_P.x)+ foot_motion_2.Kd_xt * foot_motion_2.target_vx - foot_motion_2.Kd_xr*foot_motion_2.filtered_vx;
-                    foot_motion_2.Fy = foot_motion_2.G_1 + foot_motion_2.G_0 + foot_motion_2.Kp_y * (foot_motion_2.P.y - foot_motion_2.current_P.y)+ foot_motion_2.Kd_yt * foot_motion_2.target_vy - foot_motion_2.Kd_yr*foot_motion_2.filtered_vy;
+                    foot_motion_2.Fx = jump_ff_x + foot_motion_2.Kp_x * (foot_motion_2.P.x - foot_motion_2.current_P.x)+ foot_motion_2.Kd_xt * foot_motion_2.target_vx - foot_motion_2.Kd_xr*foot_motion_2.filtered_vx;
+                    foot_motion_2.Fy = jump_ff_y + foot_motion_2.G_1 + foot_motion_2.G_0 + foot_motion_2.Kp_y * (foot_motion_2.P.y - foot_motion_2.current_P.y)+ foot_motion_2.Kd_yt * foot_motion_2.target_vy - foot_motion_2.Kd_yr*foot_motion_2.filtered_vy;
                     foot_motion_2.target_tau1 = (foot_motion_2.J.J00 * foot_motion_2.Fx + foot_motion_2.J.J10 * foot_motion_2.Fy)* joint_param_5.dir / joint_param_5.ratio;
                     foot_motion_2.target_tau2 = (foot_motion_2.J.J01 * foot_motion_2.Fx + foot_motion_2.J.J11 * foot_motion_2.Fy)* joint_param_4.dir / joint_param_4.ratio;
                     estimate_foot_force(foot_motion_2.now_tau1, foot_motion_2.now_tau2, &foot_motion_2.J, &foot_motion_2.Fx_real, &foot_motion_2.Fy_real);
@@ -789,8 +777,8 @@ void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim)
                     foot_motion_3.raw_vy = foot_motion_3.J.J10 * foot_motion_3.omega1 + foot_motion_3.J.J11 * foot_motion_3.omega2;
                     foot_motion_3.filtered_vx = VEL_ALPHA * foot_motion_3.raw_vx + (1.0f - VEL_ALPHA) * foot_motion_3.filtered_vx;
                     foot_motion_3.filtered_vy = VEL_ALPHA * foot_motion_3.raw_vy + (1.0f - VEL_ALPHA) * foot_motion_3.filtered_vy;
-                    foot_motion_3.Fx = foot_motion_3.Kp_x * (foot_motion_3.P.x - foot_motion_3.current_P.x)+ foot_motion_3.Kd_xt * foot_motion_3.target_vx - foot_motion_3.Kd_xr*foot_motion_3.filtered_vx;
-                    foot_motion_3.Fy = foot_motion_3.G_1 + foot_motion_3.G_0 + foot_motion_3.Kp_y * (foot_motion_3.P.y - foot_motion_3.current_P.y)+ foot_motion_3.Kd_yt * foot_motion_3.target_vy - foot_motion_3.Kd_yr*foot_motion_3.filtered_vy;
+                    foot_motion_3.Fx = jump_ff_x + foot_motion_3.Kp_x * (foot_motion_3.P.x - foot_motion_3.current_P.x)+ foot_motion_3.Kd_xt * foot_motion_3.target_vx - foot_motion_3.Kd_xr*foot_motion_3.filtered_vx;
+                    foot_motion_3.Fy = jump_ff_y + foot_motion_3.G_1 + foot_motion_3.G_0 + foot_motion_3.Kp_y * (foot_motion_3.P.y - foot_motion_3.current_P.y)+ foot_motion_3.Kd_yt * foot_motion_3.target_vy - foot_motion_3.Kd_yr*foot_motion_3.filtered_vy;
                     foot_motion_3.target_tau1 = (foot_motion_3.J.J00 * foot_motion_3.Fx + foot_motion_3.J.J10 * foot_motion_3.Fy)* joint_param_6.dir / joint_param_6.ratio;
                     foot_motion_3.target_tau2 = (foot_motion_3.J.J01 * foot_motion_3.Fx + foot_motion_3.J.J11 * foot_motion_3.Fy)* joint_param_7.dir / joint_param_7.ratio;
                     estimate_foot_force(foot_motion_3.now_tau1, foot_motion_3.now_tau2, &foot_motion_3.J, &foot_motion_3.Fx_real, &foot_motion_3.Fy_real);
@@ -804,6 +792,8 @@ void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim)
             }
             else if (run == 0) 
             {
+                jump_start_req = 0;
+                jump_reset();
                 cmd_0.Pos = joint_param_0.rotor_zero; PosPID_UpdateCmd(&cmd_0, cmd_0.Pos, &Pospid[0]);
                 cmd_1.Pos = joint_param_1.rotor_zero; PosPID_UpdateCmd(&cmd_1, cmd_1.Pos, &Pospid[1]);
                 cmd_2.Pos = joint_param_2.rotor_zero; PosPID_UpdateCmd(&cmd_2, cmd_2.Pos, &Pospid[2]);
@@ -825,6 +815,7 @@ void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim)
                 PosPID_UpdateCmd(&cmd_7, cmd_7.Pos, &Pospid[7]);
             }
         }
+        last_mode = mode;
     }
 }
 
@@ -851,15 +842,6 @@ void HAL_UARTEx_RxEventCallback(UART_HandleTypeDef *huart, uint16_t Size)
       COM_UART_Handle();
     }
 }
-
-// void HAL_UART_RxCpltCallback(UART_HandleTypeDef *huart)
-// {
-//     // 这个回调函数在使用空闲中断接收时不会被调用，可以留空或者删除
-//     if(huart->Instance == USART1)
-//     {
-//       HAL_UART_Receive_IT(&huart1, (uint8_t *)com_rx_data, 10);
-//     }
-// }
 
 /* USER CODE END 4 */
 

@@ -4,8 +4,7 @@ __attribute__((section(".RAM_D2")))
 static uint8_t COM_UART_TempRxBuff[12];
 uint8_t COM_UART_RxData[12]; //
 extern DMA_HandleTypeDef hdma_usart1_rx;
-// static uint8_t COM_UART_RxBuff[26];
-extern uint8_t go_dir;
+extern int8_t go_dir;
 int16_t switch_speed = 0, go_speed = 0;
 void COM_UART_Init(void)
 {
@@ -24,19 +23,20 @@ void COM_UART_Handle(void)
         COM_GetData(&go_dir);
     }
     // Handle the received data in COM_UART_RxBuff
+    // COM_GetData(&go_dir);
 }
 
-void COM_GetData(uint8_t *go_dir)
+void COM_GetData(int8_t *go_dir)
 {
     switch_speed = (int16_t)(COM_UART_RxData[10] << 8 | COM_UART_RxData[9]);
     go_speed = (int16_t)( (uint8_t)COM_UART_RxData[6] << 8 | (uint8_t)COM_UART_RxData[5] );
     if(switch_speed > 0 && go_speed == 0) *go_dir = 3; // Turn left
     else if(switch_speed < 0 && go_speed == 0) *go_dir = 4; // Turn right
-    if(go_speed > 0 && switch_speed == 0) *go_dir = 1; // Forward
+    else if(go_speed > 0 && switch_speed == 0) *go_dir = 1; // Forward
     else if(go_speed < 0 && switch_speed == 0) *go_dir = 2; // Backward
-    if(go_speed > 0 && switch_speed > 0) *go_dir = 5; // Forward right
+    else if(go_speed > 0 && switch_speed > 0) *go_dir = 5; // Forward right
     else if(go_speed > 0 && switch_speed < 0) *go_dir = 6; // Forward left
-    if(go_speed < 0 && switch_speed > 0) *go_dir = 7; // Backward right
+    else if(go_speed < 0 && switch_speed > 0) *go_dir = 7; // Backward right
     else if(go_speed < 0 && switch_speed < 0) *go_dir = 8; // Backward left
     else *go_dir = 0; // Stop
 }

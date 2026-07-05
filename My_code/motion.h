@@ -74,5 +74,10 @@ float apply_2nd_order_lpf(float input, Filter2ndState *s);
 void estimate_foot_force(float tau1, float tau2, JacobianMatrix *J, float *Fx_real, float *Fy_real);
 void set_left_right_step_length(float left_step, float right_step);
 void apply_curve_step_length(uint8_t dir, float base_step,float inner_ratio);
+void jump_reset(void);
+void jump_update(float dt);
+
+extern int8_t jump_start_req,jump_armed;
+extern float jump_ff_x,jump_ff_y;
 
 #endif // MOTION_H
