@@ -18,6 +18,7 @@
 /* USER CODE END Header */
 /* Includes ------------------------------------------------------------------*/
 #include "main.h"
+#include "control.h"
 #include "dma.h"
 #include "tim.h"
 #include "usart.h"
@@ -53,7 +54,7 @@ FootTrajParam traj_param;
 Point2D P,current_P;
 JointParam joint_param_0, joint_param_1, joint_param_2, joint_param_3, joint_param_4, joint_param_5, joint_param_6, joint_param_7;
 PosPID_t Pospid[8];
-float G_0 = -72.0F,G_1 = -72.0f,G_2 = -68.0f,G_3 = -68.0f;
+float G_0 = -55.0F,G_1 = -55.0f,G_2 = -30.0f,G_3 = -30.0f;
 float time = 0.0f,dt = 0.001f;
 float theta0_out = 0, theta1_out = 0;
 float go_0_pos=0,go_1_pos=0,go_2_pos=0,go_3_pos=0,go_4_pos=0,go_5_pos=0,go_6_pos=0,go_7_pos=0;
@@ -65,7 +66,9 @@ uint16_t speed = 0,speed_state = 0,last_speed_state = 0;//speed_state: 0-停止�
 uint32_t zhen = 0,cnt = 0,cnt_tx = 0;
 uint16_t Key[10];
 float kp_x = 400.0f, kd_xt = 25.0f, kd_xr = 20.0f;
-float kp_y = 1000.0f, kd_yt = 115.0f, kd_yr = 87.0f;
+float kp_y = 1200.0f, kd_yt = 115.0f, kd_yr = 120.0f;
+float kp_x_j = 400.0f, kd_xt_j = 25.0f, kd_xr_j = 20.0f;
+float kp_y_j = 2400.0f, kd_yt_j = 300.0f, kd_yr_j = 300.0f;
 float inner_ratio = 0.55f;
 Filter2ndState filter_w1 = {0};
 Filter2ndState filter_w2 = {0};
@@ -264,6 +267,14 @@ int main(void)
     foot_motion_1.Kp_y = kp_y; foot_motion_1.Kd_yt = kd_yt; foot_motion_1.Kd_yr = kd_yr;
     foot_motion_2.Kp_y = kp_y; foot_motion_2.Kd_yt = kd_yt; foot_motion_2.Kd_yr = kd_yr;
     foot_motion_3.Kp_y = kp_y; foot_motion_3.Kd_yt = kd_yt; foot_motion_3.Kd_yr = kd_yr;
+    foot_motion_0.Kp_x_j = kp_x_j; foot_motion_0.Kd_xt_j = kd_xt_j; foot_motion_0.Kd_xr_j = kd_xr_j;
+    foot_motion_1.Kp_x_j = kp_x_j; foot_motion_1.Kd_xt_j = kd_xt_j; foot_motion_1.Kd_xr_j = kd_xr_j;
+    foot_motion_2.Kp_x_j = kp_x_j; foot_motion_2.Kd_xt_j = kd_xt_j; foot_motion_2.Kd_xr_j = kd_xr_j;
+    foot_motion_3.Kp_x_j = kp_x_j; foot_motion_3.Kd_xt_j = kd_xt_j; foot_motion_3.Kd_xr_j = kd_xr_j;
+    foot_motion_0.Kp_y_j = kp_y_j; foot_motion_0.Kd_yt_j = kd_yt_j; foot_motion_0.Kd_yr_j = kd_yr_j;
+    foot_motion_1.Kp_y_j = kp_y_j; foot_motion_1.Kd_yt_j = kd_yt_j; foot_motion_1.Kd_yr_j = kd_yr_j;
+    foot_motion_2.Kp_y_j = kp_y_j; foot_motion_2.Kd_yt_j = kd_yt_j; foot_motion_2.Kd_yr_j = kd_yr_j;
+    foot_motion_3.Kp_y_j = kp_y_j; foot_motion_3.Kd_yt_j = kd_yt_j; foot_motion_3.Kd_yr_j = kd_yr_j;
     RS485_Schedule(&rs485);
     CRSF_Schedule();
     if(Enable)
@@ -290,48 +301,48 @@ int main(void)
               cmd_4.T = 0;cmd_5.T = 0;cmd_6.T = 0;cmd_7.T = 0;  
               if(speed_state == 3)
               {
-                  PosPID_Init(&Pospid[0], 1.0f, 0.0f, 0.01f, 0, 0.001f);  
-                  PosPID_Init(&Pospid[1], 1.0f, 0.0f, 0.01f, 0, 0.001f);
-                  PosPID_Init(&Pospid[2], 1.0f, 0.0f, 0.01f, 0, 0.001f);
-                  PosPID_Init(&Pospid[3], 1.0f, 0.0f, 0.01f, 0, 0.001f);
-                  PosPID_Init(&Pospid[4], 1.0f, 0.0f, 0.01f, 0, 0.001f);
-                  PosPID_Init(&Pospid[5], 1.0f, 0.0f, 0.01f, 0, 0.001f);
-                  PosPID_Init(&Pospid[6], 1.0f, 0.0f, 0.01f, 0, 0.001f);
-                  PosPID_Init(&Pospid[7], 1.0f, 0.0f, 0.01f, 0, 0.001f);
+                  PosPID_Set(&cmd_0,1.0f, 0.01f);  
+                  PosPID_Set(&cmd_1,1.0f, 0.01f);
+                  PosPID_Set(&cmd_2,1.0f, 0.01f);
+                  PosPID_Set(&cmd_3,1.0f, 0.01f);
+                  PosPID_Set(&cmd_4,1.0f, 0.01f);
+                  PosPID_Set(&cmd_5,1.0f, 0.01f);
+                  PosPID_Set(&cmd_6,1.0f, 0.01f);
+                  PosPID_Set(&cmd_7,1.0f, 0.01f);
               }
               else if(speed_state == 2)
               {
-                  PosPID_Init(&Pospid[0], 1.0f, 0.0f, 0.01f, 0, 0.002f);  
-                  PosPID_Init(&Pospid[1], 1.0f, 0.0f, 0.01f, 0, 0.002f);
-                  PosPID_Init(&Pospid[2], 1.0f, 0.0f, 0.01f, 0, 0.002f);
-                  PosPID_Init(&Pospid[3], 1.0f, 0.0f, 0.01f, 0, 0.002f);
-                  PosPID_Init(&Pospid[4], 1.0f, 0.0f, 0.01f, 0, 0.002f);
-                  PosPID_Init(&Pospid[5], 1.0f, 0.0f, 0.01f, 0, 0.002f);
-                  PosPID_Init(&Pospid[6], 1.0f, 0.0f, 0.01f, 0, 0.002f);
-                  PosPID_Init(&Pospid[7], 1.0f, 0.0f, 0.01f, 0, 0.002f);
+                  PosPID_Set(&cmd_0,1.0f, 0.01f);  
+                  PosPID_Set(&cmd_1,1.0f, 0.01f);
+                  PosPID_Set(&cmd_2,1.0f, 0.01f);
+                  PosPID_Set(&cmd_3,1.0f, 0.01f);
+                  PosPID_Set(&cmd_4,1.0f, 0.01f);
+                  PosPID_Set(&cmd_5,1.0f, 0.01f);
+                  PosPID_Set(&cmd_6,1.0f, 0.01f);
+                  PosPID_Set(&cmd_7,1.0f, 0.01f);
               }
               else if(speed_state == 1)
               {
-                  PosPID_Init(&Pospid[0], 0.6f, 0.0f, 0.01f, 0, 0.003f);  
-                  PosPID_Init(&Pospid[1], 0.6f, 0.0f, 0.01f, 0, 0.003f);
-                  PosPID_Init(&Pospid[2], 0.6f, 0.0f, 0.01f, 0, 0.003f);
-                  PosPID_Init(&Pospid[3], 0.6f, 0.0f, 0.01f, 0, 0.003f);
-                  PosPID_Init(&Pospid[4], 0.6f, 0.0f, 0.01f, 0, 0.003f);
-                  PosPID_Init(&Pospid[5], 0.6f, 0.0f, 0.01f, 0, 0.003f);
-                  PosPID_Init(&Pospid[6], 0.6f, 0.0f, 0.01f, 0, 0.003f);
-                  PosPID_Init(&Pospid[7], 0.6f, 0.0f, 0.01f, 0, 0.003f);
+                  PosPID_Set(&cmd_0,0.6f, 0.01f);  
+                  PosPID_Set(&cmd_1,0.6f, 0.01f);
+                  PosPID_Set(&cmd_2,0.6f, 0.01f);
+                  PosPID_Set(&cmd_3,0.6f, 0.01f);
+                  PosPID_Set(&cmd_4,0.6f, 0.01f);
+                  PosPID_Set(&cmd_5,0.6f, 0.01f);
+                  PosPID_Set(&cmd_6,0.6f, 0.01f);
+                  PosPID_Set(&cmd_7,0.6f, 0.01f);
               }
             }
             else if(control_mode == 1)
             {
-                PosPID_Init(&Pospid[0], 0.0f, 0.0f, 0.00f, 0, 0.003f);  
-                PosPID_Init(&Pospid[1], 0.0f, 0.0f, 0.00f, 0, 0.003f);
-                PosPID_Init(&Pospid[2], 0.0f, 0.0f, 0.00f, 0, 0.003f);
-                PosPID_Init(&Pospid[3], 0.0f, 0.0f, 0.00f, 0, 0.003f);
-                PosPID_Init(&Pospid[4], 0.0f, 0.0f, 0.00f, 0, 0.003f);
-                PosPID_Init(&Pospid[5], 0.0f, 0.0f, 0.00f, 0, 0.003f);
-                PosPID_Init(&Pospid[6], 0.0f, 0.0f, 0.00f, 0, 0.003f);
-                PosPID_Init(&Pospid[7], 0.0f, 0.0f, 0.00f, 0, 0.003f);
+                PosPID_Set(&cmd_0,0.0f, 0.0f);  
+                PosPID_Set(&cmd_1,0.0f, 0.0f);
+                PosPID_Set(&cmd_2,0.0f, 0.0f);
+                PosPID_Set(&cmd_3,0.0f, 0.0f);
+                PosPID_Set(&cmd_4,0.0f, 0.0f);
+                PosPID_Set(&cmd_5,0.0f, 0.0f);
+                PosPID_Set(&cmd_6,0.0f, 0.0f);
+                PosPID_Set(&cmd_7,0.0f, 0.0f);
             }
         }
     }
@@ -339,14 +350,14 @@ int main(void)
     {
       cmd_0.T = 0;cmd_1.T = 0;cmd_2.T = 0;cmd_3.T = 0;
       cmd_4.T = 0;cmd_5.T = 0;cmd_6.T = 0;cmd_7.T = 0;   
-      PosPID_Init(&Pospid[0], 0, 0, 0, 0, 0);  
-      PosPID_Init(&Pospid[1], 0, 0, 0, 0, 0);
-      PosPID_Init(&Pospid[2], 0, 0, 0, 0, 0);
-      PosPID_Init(&Pospid[3], 0, 0, 0, 0, 0);
-      PosPID_Init(&Pospid[4], 0, 0, 0, 0, 0);
-      PosPID_Init(&Pospid[5], 0, 0, 0, 0, 0);
-      PosPID_Init(&Pospid[6], 0, 0, 0, 0, 0);
-      PosPID_Init(&Pospid[7], 0, 0, 0, 0, 0);
+      PosPID_Set(&cmd_0,0.0f, 0.0f);  
+      PosPID_Set(&cmd_1,0.0f, 0.0f);
+      PosPID_Set(&cmd_2,0.0f, 0.0f);
+      PosPID_Set(&cmd_3,0.0f, 0.0f);
+      PosPID_Set(&cmd_4,0.0f, 0.0f);
+      PosPID_Set(&cmd_5,0.0f, 0.0f);
+      PosPID_Set(&cmd_6,0.0f, 0.0f);
+      PosPID_Set(&cmd_7,0.0f, 0.0f);
     } 
   }
   /* USER CODE END 3 */
@@ -488,48 +499,57 @@ void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim)
             if((run == 1))
             {   
                 last_speed_state = speed_state;
-                if(speed>=1100) 
+                if(control_mode == 2)
                 {
-                  foot_motion_0.track.step_length  = 0.100f;
-                  foot_motion_1.track.step_length  = 0.100f;
-                  foot_motion_2.track.step_length  = 0.100f;
-                  foot_motion_3.track.step_length  = 0.100f;
-                  traj_param.period = 0.25f;
-                  speed_state = 3;
+                  nav_update_step_length(go_speed, switch_speed, traj_param.period, &inner_ratio);
+                  if(go_dir == 0) speed_state = 0;
+                  else speed_state = 1;
                 }
-                else if(speed<1100 && speed >= 400) 
+                else
                 {
-                  foot_motion_0.track.step_length  = 0.100f;
-                  foot_motion_1.track.step_length  = 0.100f;
-                  foot_motion_2.track.step_length  = 0.100f;
-                  foot_motion_3.track.step_length  = 0.100f;
-                  traj_param.period = 0.3f;
-                  speed_state = 2;
+                  if(speed>=1100) 
+                  {
+                    foot_motion_0.track.step_length  = 0.100f;
+                    foot_motion_1.track.step_length  = 0.100f;
+                    foot_motion_2.track.step_length  = 0.100f;
+                    foot_motion_3.track.step_length  = 0.100f;
+                    traj_param.period = 0.25f;
+                    speed_state = 3;
+                  }
+                  else if(speed<1100 && speed >= 400) 
+                  {
+                    foot_motion_0.track.step_length  = 0.100f;
+                    foot_motion_1.track.step_length  = 0.100f;
+                    foot_motion_2.track.step_length  = 0.100f;
+                    foot_motion_3.track.step_length  = 0.100f;
+                    traj_param.period = 0.3f;
+                    speed_state = 2;
+                  }
+                  else if(speed<400 && speed >=0) 
+                  {
+                    foot_motion_0.track.step_length  = 0.100f; 
+                    foot_motion_1.track.step_length  = 0.100f; 
+                    foot_motion_2.track.step_length  = 0.100f; 
+                    foot_motion_3.track.step_length  = 0.100f; 
+                    traj_param.period = 0.4f;
+                    speed_state = 1;
+                  }
+                  apply_curve_step_length(go_dir, foot_motion_0.track.step_length, inner_ratio);
                 }
-                else if(speed<400 && speed >=0) 
-                {
-                  foot_motion_0.track.step_length  = 0.100f; 
-                  foot_motion_1.track.step_length  = 0.100f; 
-                  foot_motion_2.track.step_length  = 0.100f; 
-                  foot_motion_3.track.step_length  = 0.100f; 
-                  traj_param.period = 0.4f;
-                  speed_state = 1;
-                }
-                apply_curve_step_length(go_dir, foot_motion_0.track.step_length, inner_ratio);
                 if(last_speed_state!= speed_state) {time = 0.0f;}
                 // if(last_mode == 1 && mode == 2) {stand_flag = 2;}
                 if(control_mode == 0 || control_mode == 2)
                 {                                  
                   if(mode == 1)
                   {
-                    cmd_0.Pos = output_to_rotor(-PI, &joint_param_0); PosPID_UpdateCmd(&cmd_0, 0, &Pospid[0]);
-                    cmd_1.Pos = output_to_rotor(0, &joint_param_1); PosPID_UpdateCmd(&cmd_1, -PI, &Pospid[1]);
-                    cmd_2.Pos = output_to_rotor(-PI, &joint_param_2); PosPID_UpdateCmd(&cmd_2, PI, &Pospid[2]);
-                    cmd_3.Pos = output_to_rotor(0, &joint_param_3); PosPID_UpdateCmd(&cmd_3, PI, &Pospid[3]);
-                    cmd_4.Pos = output_to_rotor(-PI, &joint_param_4); PosPID_UpdateCmd(&cmd_4, PI, &Pospid[4]);
-                    cmd_5.Pos = output_to_rotor(0, &joint_param_5); PosPID_UpdateCmd(&cmd_5, PI, &Pospid[5]);
-                    cmd_6.Pos = output_to_rotor(0, &joint_param_6); PosPID_UpdateCmd(&cmd_6, -2*PI, &Pospid[6]);
-                    cmd_7.Pos = output_to_rotor(-PI, &joint_param_7); PosPID_UpdateCmd(&cmd_7, 0, &Pospid[7]);
+                    cmd_0.Pos = output_to_rotor(-PI, &joint_param_0); 
+                    cmd_1.Pos = output_to_rotor(0, &joint_param_1); 
+                    cmd_2.Pos = output_to_rotor(-PI, &joint_param_2); 
+                    cmd_3.Pos = output_to_rotor(0, &joint_param_3); 
+                    cmd_4.Pos = output_to_rotor(-PI, &joint_param_4); 
+                    cmd_5.Pos = output_to_rotor(0, &joint_param_5); 
+                    cmd_6.Pos = output_to_rotor(0, &joint_param_6); 
+                    cmd_7.Pos = output_to_rotor(-PI, &joint_param_7); 
                     time = 0.0f;
                     // stand_flag = 1;
                   }
@@ -572,29 +592,32 @@ void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim)
                       {
                         go_0_pos = theta1_out;
                         go_1_pos = theta0_out;
-                        cmd_0.Pos = output_to_rotor(go_0_pos, &joint_param_0); PosPID_UpdateCmd(&cmd_0, (PI-theta1_out), &Pospid[0]);//正向
-                        cmd_1.Pos = output_to_rotor(go_1_pos, &joint_param_1); PosPID_UpdateCmd(&cmd_1, theta0_out, &Pospid[1]);//正向
                       }
                       if(fivebar_inverse(foot_motion_1.P.x, foot_motion_1.P.y, &theta0_out, &theta1_out, true))//右前腿 2，3，  
                       {
                         go_2_pos = theta1_out; 
-                        go_3_pos = theta0_out; 
-                        cmd_2.Pos = output_to_rotor(go_2_pos, &joint_param_2); PosPID_UpdateCmd(&cmd_2, (PI-theta0_out), &Pospid[2]); //反向                  
-                        cmd_3.Pos = output_to_rotor(go_3_pos, &joint_param_3); PosPID_UpdateCmd(&cmd_3, theta1_out, &Pospid[3]);//反向
+                        go_3_pos = theta0_out;                     
                       }   
                       if(fivebar_inverse(foot_motion_2.P.x, foot_motion_2.P.y, &theta0_out, &theta1_out, true))//右后腿 4，5
                       {
                         go_4_pos = theta1_out;                
-                        go_5_pos = theta0_out;                  
-                        cmd_4.Pos = output_to_rotor(go_4_pos, &joint_param_4); PosPID_UpdateCmd(&cmd_4, (PI-theta0_out), &Pospid[4]);//反向                 
-                        cmd_5.Pos = output_to_rotor(go_5_pos, &joint_param_5); PosPID_UpdateCmd(&cmd_5, theta1_out, &Pospid[5]);//反向                    
+                        go_5_pos = theta0_out;                                                         
                       }                 
                       if(fivebar_inverse(foot_motion_3.P.x, foot_motion_3.P.y, &theta0_out, &theta1_out, true))//左后腿 6，7  
                       {                       
                         go_7_pos=  theta1_out;
-                        go_6_pos = theta0_out;           
-                        cmd_6.Pos = output_to_rotor(go_6_pos, &joint_param_6); PosPID_UpdateCmd(&cmd_6, theta0_out, &Pospid[6]);//正向                  
-                        cmd_7.Pos = output_to_rotor(go_7_pos, &joint_param_7); PosPID_UpdateCmd(&cmd_7, (PI-theta1_out), &Pospid[7]);//正向                            
+                        go_6_pos = theta0_out;                                                               
+                      }
+                      if(Enable)
+                      {
+                        cmd_0.Pos = output_to_rotor(go_0_pos, &joint_param_0); 
+                        cmd_1.Pos = output_to_rotor(go_1_pos, &joint_param_1); 
+                        cmd_2.Pos = output_to_rotor(go_2_pos, &joint_param_2);                 
+                        cmd_3.Pos = output_to_rotor(go_3_pos, &joint_param_3); 
+                        cmd_4.Pos = output_to_rotor(go_4_pos, &joint_param_4);                
+                        cmd_5.Pos = output_to_rotor(go_5_pos, &joint_param_5);  
+                        cmd_6.Pos = output_to_rotor(go_6_pos, &joint_param_6);                  
+                        cmd_7.Pos = output_to_rotor(go_7_pos, &joint_param_7);
                       }     
                                
                   }
@@ -726,8 +749,16 @@ void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim)
                     foot_motion_0.raw_vy = foot_motion_0.J.J10 * foot_motion_0.omega1 + foot_motion_0.J.J11 * foot_motion_0.omega2;
                     foot_motion_0.filtered_vx = VEL_ALPHA * foot_motion_0.raw_vx + (1.0f - VEL_ALPHA) * foot_motion_0.filtered_vx;
                     foot_motion_0.filtered_vy = VEL_ALPHA * foot_motion_0.raw_vy + (1.0f - VEL_ALPHA) * foot_motion_0.filtered_vy;
-                    foot_motion_0.Fx = jump_ff_x + foot_motion_0.Kp_x * (foot_motion_0.P.x - foot_motion_0.current_P.x)+ foot_motion_0.Kd_xt * foot_motion_0.target_vx - foot_motion_0.Kd_xr*foot_motion_0.filtered_vx;
-                    foot_motion_0.Fy = jump_ff_y + foot_motion_0.G_1 + foot_motion_0.G_0 + foot_motion_0.Kp_y * (foot_motion_0.P.y - foot_motion_0.current_P.y)+ foot_motion_0.Kd_yt * foot_motion_0.target_vy - foot_motion_0.Kd_yr*foot_motion_0.filtered_vy;
+                    if(mode == 1|| mode == 2)
+                    {
+                      foot_motion_0.Fx =foot_motion_0.Kp_x * (foot_motion_0.P.x - foot_motion_0.current_P.x)+ foot_motion_0.Kd_xt * foot_motion_0.target_vx - foot_motion_0.Kd_xr*foot_motion_0.filtered_vx;
+                      foot_motion_0.Fy =foot_motion_0.G_1 + foot_motion_0.G_0 + foot_motion_0.Kp_y * (foot_motion_0.P.y - foot_motion_0.current_P.y)+ foot_motion_0.Kd_yt * foot_motion_0.target_vy - foot_motion_0.Kd_yr*foot_motion_0.filtered_vy;
+                    }
+                    else if(mode == 3)
+                    {
+                      foot_motion_0.Fx = jump_ff_x + foot_motion_0.Kp_x_j * (foot_motion_0.P.x - foot_motion_0.current_P.x)+ foot_motion_0.Kd_xt * foot_motion_0.target_vx - foot_motion_0.Kd_xr*foot_motion_0.filtered_vx;
+                      foot_motion_0.Fy = jump_ff_y + foot_motion_0.Kp_y_j * (foot_motion_0.P.y - foot_motion_0.current_P.y)+ foot_motion_0.Kd_yt * foot_motion_0.target_vy - foot_motion_0.Kd_yr*foot_motion_0.filtered_vy;
+                    }
                     foot_motion_0.target_tau1 = (foot_motion_0.J.J00 * foot_motion_0.Fx + foot_motion_0.J.J10 * foot_motion_0.Fy)* joint_param_1.dir / joint_param_1.ratio;
                     foot_motion_0.target_tau2 = (foot_motion_0.J.J01 * foot_motion_0.Fx + foot_motion_0.J.J11 * foot_motion_0.Fy)* joint_param_0.dir / joint_param_0.ratio;
                     estimate_foot_force(foot_motion_0.now_tau1, foot_motion_0.now_tau2, &foot_motion_0.J, &foot_motion_0.Fx_real, &foot_motion_0.Fy_real);
@@ -743,8 +774,16 @@ void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim)
                     foot_motion_1.raw_vy = foot_motion_1.J.J10 * foot_motion_1.omega1 + foot_motion_1.J.J11 * foot_motion_1.omega2;
                     foot_motion_1.filtered_vx = VEL_ALPHA * foot_motion_1.raw_vx + (1.0f - VEL_ALPHA) * foot_motion_1.filtered_vx;
                     foot_motion_1.filtered_vy = VEL_ALPHA * foot_motion_1.raw_vy + (1.0f - VEL_ALPHA) * foot_motion_1.filtered_vy;
-                    foot_motion_1.Fx = jump_ff_x + foot_motion_1.Kp_x * (foot_motion_1.P.x - foot_motion_1.current_P.x)+ foot_motion_1.Kd_xt * foot_motion_1.target_vx - foot_motion_1.Kd_xr*foot_motion_1.filtered_vx;
-                    foot_motion_1.Fy = jump_ff_y + foot_motion_1.G_1 + foot_motion_1.G_0 + foot_motion_1.Kp_y * (foot_motion_1.P.y - foot_motion_1.current_P.y)+ foot_motion_1.Kd_yt * foot_motion_1.target_vy - foot_motion_1.Kd_yr*foot_motion_1.filtered_vy;
+                    if(mode == 1|| mode == 2)
+                    {
+                      foot_motion_1.Fx =foot_motion_1.Kp_x * (foot_motion_1.P.x - foot_motion_1.current_P.x)+ foot_motion_1.Kd_xt * foot_motion_1.target_vx - foot_motion_1.Kd_xr*foot_motion_1.filtered_vx;
+                      foot_motion_1.Fy =foot_motion_1.G_1 + foot_motion_1.G_0 + foot_motion_1.Kp_y * (foot_motion_1.P.y - foot_motion_1.current_P.y)+ foot_motion_1.Kd_yt * foot_motion_1.target_vy - foot_motion_1.Kd_yr*foot_motion_1.filtered_vy;
+                    }
+                    else if(mode == 3)
+                    {
+                      foot_motion_1.Fx = jump_ff_x + foot_motion_1.Kp_x_j * (foot_motion_1.P.x - foot_motion_1.current_P.x)+ foot_motion_1.Kd_xt * foot_motion_1.target_vx - foot_motion_1.Kd_xr*foot_motion_1.filtered_vx;
+                      foot_motion_1.Fy = jump_ff_y + foot_motion_1.Kp_y_j * (foot_motion_1.P.y - foot_motion_1.current_P.y)+ foot_motion_1.Kd_yt * foot_motion_1.target_vy - foot_motion_1.Kd_yr*foot_motion_1.filtered_vy;
+                    }
                     foot_motion_1.target_tau1 = (foot_motion_1.J.J00 * foot_motion_1.Fx + foot_motion_1.J.J10 * foot_motion_1.Fy)* joint_param_3.dir / joint_param_3.ratio;
                     foot_motion_1.target_tau2 = (foot_motion_1.J.J01 * foot_motion_1.Fx + foot_motion_1.J.J11 * foot_motion_1.Fy)* joint_param_2.dir / joint_param_2.ratio;
                     estimate_foot_force(foot_motion_1.now_tau1, foot_motion_1.now_tau2, &foot_motion_1.J, &foot_motion_1.Fx_real, &foot_motion_1.Fy_real);
@@ -760,8 +799,16 @@ void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim)
                     foot_motion_2.raw_vy = foot_motion_2.J.J10 * foot_motion_2.omega1 + foot_motion_2.J.J11 * foot_motion_2.omega2;
                     foot_motion_2.filtered_vx = VEL_ALPHA * foot_motion_2.raw_vx + (1.0f - VEL_ALPHA) * foot_motion_2.filtered_vx;
                     foot_motion_2.filtered_vy = VEL_ALPHA * foot_motion_2.raw_vy + (1.0f - VEL_ALPHA) * foot_motion_2.filtered_vy;
-                    foot_motion_2.Fx = jump_ff_x + foot_motion_2.Kp_x * (foot_motion_2.P.x - foot_motion_2.current_P.x)+ foot_motion_2.Kd_xt * foot_motion_2.target_vx - foot_motion_2.Kd_xr*foot_motion_2.filtered_vx;
-                    foot_motion_2.Fy = jump_ff_y + foot_motion_2.G_1 + foot_motion_2.G_0 + foot_motion_2.Kp_y * (foot_motion_2.P.y - foot_motion_2.current_P.y)+ foot_motion_2.Kd_yt * foot_motion_2.target_vy - foot_motion_2.Kd_yr*foot_motion_2.filtered_vy;
+                    if(mode == 1|| mode == 2)
+                    {
+                      foot_motion_2.Fx =foot_motion_2.Kp_x * (foot_motion_2.P.x - foot_motion_2.current_P.x)+ foot_motion_2.Kd_xt * foot_motion_2.target_vx - foot_motion_2.Kd_xr*foot_motion_2.filtered_vx;
+                      foot_motion_2.Fy =foot_motion_2.G_1 + foot_motion_2.G_0 + foot_motion_2.Kp_y * (foot_motion_2.P.y - foot_motion_2.current_P.y)+ foot_motion_2.Kd_yt * foot_motion_2.target_vy - foot_motion_2.Kd_yr*foot_motion_2.filtered_vy;
+                    }
+                    else if(mode == 3)
+                    {
+                      foot_motion_2.Fx = jump_ff_x + foot_motion_2.Kp_x_j * (foot_motion_2.P.x - foot_motion_2.current_P.x)+ foot_motion_2.Kd_xt * foot_motion_2.target_vx - foot_motion_2.Kd_xr*foot_motion_2.filtered_vx;
+                      foot_motion_2.Fy = jump_ff_y + foot_motion_2.Kp_y_j * (foot_motion_2.P.y - foot_motion_2.current_P.y)+ foot_motion_2.Kd_yt * foot_motion_2.target_vy - foot_motion_2.Kd_yr*foot_motion_2.filtered_vy;
+                    }
                     foot_motion_2.target_tau1 = (foot_motion_2.J.J00 * foot_motion_2.Fx + foot_motion_2.J.J10 * foot_motion_2.Fy)* joint_param_5.dir / joint_param_5.ratio;
                     foot_motion_2.target_tau2 = (foot_motion_2.J.J01 * foot_motion_2.Fx + foot_motion_2.J.J11 * foot_motion_2.Fy)* joint_param_4.dir / joint_param_4.ratio;
                     estimate_foot_force(foot_motion_2.now_tau1, foot_motion_2.now_tau2, &foot_motion_2.J, &foot_motion_2.Fx_real, &foot_motion_2.Fy_real);
@@ -777,8 +824,16 @@ void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim)
                     foot_motion_3.raw_vy = foot_motion_3.J.J10 * foot_motion_3.omega1 + foot_motion_3.J.J11 * foot_motion_3.omega2;
                     foot_motion_3.filtered_vx = VEL_ALPHA * foot_motion_3.raw_vx + (1.0f - VEL_ALPHA) * foot_motion_3.filtered_vx;
                     foot_motion_3.filtered_vy = VEL_ALPHA * foot_motion_3.raw_vy + (1.0f - VEL_ALPHA) * foot_motion_3.filtered_vy;
-                    foot_motion_3.Fx = jump_ff_x + foot_motion_3.Kp_x * (foot_motion_3.P.x - foot_motion_3.current_P.x)+ foot_motion_3.Kd_xt * foot_motion_3.target_vx - foot_motion_3.Kd_xr*foot_motion_3.filtered_vx;
-                    foot_motion_3.Fy = jump_ff_y + foot_motion_3.G_1 + foot_motion_3.G_0 + foot_motion_3.Kp_y * (foot_motion_3.P.y - foot_motion_3.current_P.y)+ foot_motion_3.Kd_yt * foot_motion_3.target_vy - foot_motion_3.Kd_yr*foot_motion_3.filtered_vy;
+                    if(mode == 1|| mode == 2)
+                    {
+                      foot_motion_3.Fx =foot_motion_3.Kp_x * (foot_motion_3.P.x - foot_motion_3.current_P.x)+ foot_motion_3.Kd_xt * foot_motion_3.target_vx - foot_motion_3.Kd_xr*foot_motion_3.filtered_vx;
+                      foot_motion_3.Fy =foot_motion_3.G_1 + foot_motion_3.G_0 + foot_motion_3.Kp_y * (foot_motion_3.P.y - foot_motion_3.current_P.y)+ foot_motion_3.Kd_yt * foot_motion_3.target_vy - foot_motion_3.Kd_yr*foot_motion_3.filtered_vy;
+                    }
+                    else if(mode == 3)
+                    {
+                      foot_motion_3.Fx = jump_ff_x + foot_motion_3.Kp_x_j * (foot_motion_3.P.x - foot_motion_3.current_P.x)+ foot_motion_3.Kd_xt * foot_motion_3.target_vx - foot_motion_3.Kd_xr*foot_motion_3.filtered_vx;
+                      foot_motion_3.Fy = jump_ff_y + foot_motion_3.Kp_y_j * (foot_motion_3.P.y - foot_motion_3.current_P.y)+ foot_motion_3.Kd_yt * foot_motion_3.target_vy - foot_motion_3.Kd_yr*foot_motion_3.filtered_vy;
+                    }
                     foot_motion_3.target_tau1 = (foot_motion_3.J.J00 * foot_motion_3.Fx + foot_motion_3.J.J10 * foot_motion_3.Fy)* joint_param_6.dir / joint_param_6.ratio;
                     foot_motion_3.target_tau2 = (foot_motion_3.J.J01 * foot_motion_3.Fx + foot_motion_3.J.J11 * foot_motion_3.Fy)* joint_param_7.dir / joint_param_7.ratio;
                     estimate_foot_force(foot_motion_3.now_tau1, foot_motion_3.now_tau2, &foot_motion_3.J, &foot_motion_3.Fx_real, &foot_motion_3.Fy_real);
@@ -794,28 +849,17 @@ void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim)
             {
                 jump_start_req = 0;
                 jump_reset();
-                cmd_0.Pos = joint_param_0.rotor_zero; PosPID_UpdateCmd(&cmd_0, cmd_0.Pos, &Pospid[0]);
-                cmd_1.Pos = joint_param_1.rotor_zero; PosPID_UpdateCmd(&cmd_1, cmd_1.Pos, &Pospid[1]);
-                cmd_2.Pos = joint_param_2.rotor_zero; PosPID_UpdateCmd(&cmd_2, cmd_2.Pos, &Pospid[2]);
-                cmd_3.Pos = joint_param_3.rotor_zero; PosPID_UpdateCmd(&cmd_3, cmd_3.Pos, &Pospid[3]);
-                cmd_4.Pos = joint_param_4.rotor_zero; PosPID_UpdateCmd(&cmd_4, cmd_4.Pos, &Pospid[4]);
-                cmd_5.Pos = joint_param_5.rotor_zero; PosPID_UpdateCmd(&cmd_5, cmd_5.Pos, &Pospid[5]);
-                cmd_6.Pos = joint_param_6.rotor_zero; PosPID_UpdateCmd(&cmd_6, cmd_6.Pos, &Pospid[6]);
-                cmd_7.Pos = joint_param_7.rotor_zero; PosPID_UpdateCmd(&cmd_7, cmd_7.Pos, &Pospid[7]);
-            }
-            if(Enable == 0)
-            {
-                PosPID_UpdateCmd(&cmd_0, cmd_0.Pos, &Pospid[0]);
-                PosPID_UpdateCmd(&cmd_1, cmd_1.Pos, &Pospid[1]);
-                PosPID_UpdateCmd(&cmd_2, cmd_2.Pos, &Pospid[2]);
-                PosPID_UpdateCmd(&cmd_3, cmd_3.Pos, &Pospid[3]);
-                PosPID_UpdateCmd(&cmd_4, cmd_4.Pos, &Pospid[4]);
-                PosPID_UpdateCmd(&cmd_5, cmd_5.Pos, &Pospid[5]);
-                PosPID_UpdateCmd(&cmd_6, cmd_6.Pos, &Pospid[6]);
-                PosPID_UpdateCmd(&cmd_7, cmd_7.Pos, &Pospid[7]);
+                cmd_0.Pos = joint_param_0.rotor_zero; 
+                cmd_1.Pos = joint_param_1.rotor_zero; 
+                cmd_2.Pos = joint_param_2.rotor_zero; 
+                cmd_3.Pos = joint_param_3.rotor_zero;
+                cmd_4.Pos = joint_param_4.rotor_zero;
+                cmd_5.Pos = joint_param_5.rotor_zero; 
+                cmd_6.Pos = joint_param_6.rotor_zero; 
+                cmd_7.Pos = joint_param_7.rotor_zero; 
             }
         }
-        last_mode = mode;
+        // last_mode = mode;
     }
 }
 

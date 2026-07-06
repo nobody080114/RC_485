@@ -13,25 +13,29 @@ extern Foot_motion foot_motion_0,foot_motion_1,foot_motion_2,foot_motion_3;
 
 // 跳跃足端目标参数，单位：x/y 为 m，time 为 s，前馈力为 N。
 // 坐标约定：y 越负腿越伸长；x 越负表示足端向后蹬，机体获得向前趋势。
-#define JUMP_STAND_X        0.000f   // 站立/恢复时足端 x 位置。
-#define JUMP_STAND_Y       -0.173f   // 站立高度，作为跳跃前后默认腿长。
-#define JUMP_CROUCH_X       0.000f   // 下蹲阶段足端 x 位置，通常保持中位。
-#define JUMP_CROUCH_Y      -0.100f   // 下蹲高度，越接近 0 腿收得越短，蓄力空间越大。
-#define JUMP_THRUST_X      -0.100f   // 蹬伸阶段足端向后目标，越负向前跳得越远。
-#define JUMP_THRUST_Y      -0.800f   // 蹬伸阶段腿伸长目标，越负向上蹬地越强。
-#define JUMP_FLIGHT_X       0.080f   // 腾空阶段收腿向前摆的位置，用于准备落地。
-#define JUMP_FLIGHT_Y      -0.135f   // 腾空阶段收腿高度，越接近 0 越不容易拖地。
-#define JUMP_LAND_X         0.000f   // 落地缓冲阶段足端 x 回中。
-#define JUMP_LAND_Y        -0.180f   // 落地缓冲腿长，略低于站立高度用于吸收冲击。
-#define JUMP_CROUCH_TIME    0.300f   // 下蹲持续时间，过短会蓄力不足，过长动作拖沓。
-#define JUMP_THRUST_TIME    0.800f   // 蹬伸持续时间，增大可提高跳高/跳远，但过大会冲击大。
-#define JUMP_FLIGHT_TIME    0.220f   // 腾空最长等待时间，超时会强制进入落地缓冲。
-#define JUMP_LAND_TIME      0.160f   // 落地缓冲持续时间，增大可更软但恢复更慢。
-#define JUMP_RECOVER_TIME   0.150f   // 从落地缓冲恢复到站立的时间。
-#define JUMP_THRUST_FF_X  -100.0f     // 蹬伸 x 方向前馈，越负向前冲量越大。
-#define JUMP_THRUST_FF_Y  -300.0f     // 蹬伸 y 方向前馈，越负向上蹬地越强。
-#define JUMP_LAND_FF_Y     -8.0f     // 落地阶段 y 方向轻微支撑前馈，用于辅助缓冲。
-#define JUMP_LAND_Y_DETECT -0.160f   // 落地检测阈值，至少两腿 current_P.y 大于该值认为触地。
+float JUMP_STAND_X        = 0.000f;   // 站立/恢复时足端 x 位置。
+float JUMP_STAND_Y        = -0.173f;  // 站立高度，作为跳跃前后默认腿长。
+float JUMP_CROUCH_X       = 0.000f;   // 下蹲阶段足端 x 位置，通常保持中位。
+float JUMP_CROUCH_Y       = -0.100f;  // 下蹲高度，越接近 0 腿收得越短，蓄力空间越大。
+float JUMP_THRUST_X       = -0.100f;  // 蹬伸阶段足端向后目标，越负向前跳得越远。
+float JUMP_THRUST_Y       = -0.270f;  // 蹬伸阶段腿伸长目标，越负向上蹬地越强。
+float JUMP_FLIGHT_X       = 0.040f;   // 腾空阶段收腿向前摆的位置，用于准备落地。
+float JUMP_FLIGHT_Y       = -0.07f;  // 腾空阶段收腿高度，越接近 0 越不容易拖地。
+float JUMP_LAND_X         = 0.000f;   // 落地缓冲阶段足端 x 回中。
+float JUMP_LAND_Y         = -0.180f;  // 落地缓冲腿长，略低于站立高度用于吸收冲击。
+float JUMP_CROUCH_TIME    = 0.120f;   // 下蹲持续时间，过短会蓄力不足，过长动作拖沓。
+float JUMP_THRUST_TIME    = 0.110f;   // 蹬伸持续时间，增大可提高跳高/跳远，但过大会冲击大。
+float JUMP_FLIGHT_TIME    = 1.00f;   // 腾空最长等待时间，超时会强制进入落地缓冲。
+float JUMP_LAND_TIME      = 1.0f;   // 落地缓冲持续时间，增大可更软但恢复更慢。
+float JUMP_RECOVER_TIME   = 0.150f;   // 从落地缓冲恢复到站立的时间。
+float JUMP_THRUST_FF_X    = -50.0f;   // 蹬伸 x 方向前馈，越负向前冲量越大。
+float JUMP_THRUST_FF_Y    = -350.0f;   // 蹬伸 y 方向前馈，越负向上蹬地越强。
+float JUMP_LAND_FF_Y      = -8.0f;    // 落地阶段 y 方向轻微支撑前馈，用于辅助缓冲。
+float JUMP_LAND_Y_DETECT  = -0.160f;  // 落地检测阈值，至少两腿 current_P.y 大于该值认为触地。
+
+#define NAV_GO_SPEED_LIMIT_CM_S     15.0f
+#define NAV_SWITCH_SPEED_LIMIT_CM_S 20.0f
+#define NAV_MAX_STEP_LENGTH          0.120f
 
 typedef enum {
     JUMP_IDLE = 0,
@@ -47,15 +51,22 @@ float jump_ff_x = 0.0f, jump_ff_y = 0.0f;
 
 static JumpState jump_state = JUMP_IDLE;
 static float jump_state_time = 0.0f;
-static float jump_start_x = JUMP_STAND_X;
-static float jump_start_y = JUMP_STAND_Y;
-static float jump_end_x = JUMP_STAND_X;
-static float jump_end_y = JUMP_STAND_Y;
+static float jump_start_x = 0.000f;
+static float jump_start_y = -0.173f;
+static float jump_end_x = 0.000f;
+static float jump_end_y = -0.173f;
 
 static float clamp01(float value)
 {
     if(value < 0.0f) return 0.0f;
     if(value > 1.0f) return 1.0f;
+    return value;
+}
+
+static float clampf_local(float value, float min_value, float max_value)
+{
+    if(value < min_value) return min_value;
+    if(value > max_value) return max_value;
     return value;
 }
 
@@ -217,7 +228,7 @@ void foot_ellipse_trajectory(float time,Foot_motion *param,FootTrajParam *traj)
     else
     {
         param->P.y = param->track.stand_height
-                     - param->track.step_height * sinf(phi);
+                     - param->track.step_height * arm_sin_f32(phi);
     }
 }
 
@@ -532,6 +543,49 @@ void set_left_right_step_length(float left_step, float right_step)
   foot_motion_3.track.step_length = left_step;   // left rear
   foot_motion_1.track.step_length = right_step;  // right front
   foot_motion_2.track.step_length = right_step;  // right rear
+}
+
+void nav_update_step_length(int16_t go_speed_cm_s, int16_t switch_speed_cm_s, float period, float *inner_ratio)
+{
+  float go_speed = clampf_local((float)go_speed_cm_s, -NAV_GO_SPEED_LIMIT_CM_S, NAV_GO_SPEED_LIMIT_CM_S);
+  float switch_speed = clampf_local((float)switch_speed_cm_s, -NAV_SWITCH_SPEED_LIMIT_CM_S, NAV_SWITCH_SPEED_LIMIT_CM_S);
+  float go_step = fabsf(go_speed) * 0.01f * period;
+  float switch_step = fabsf(switch_speed) * 0.01f * period;
+  float left_step = go_step;
+  float right_step = go_step;
+  float ratio = 1.0f;
+
+  go_step = clampf_local(go_step, 0.0f, NAV_MAX_STEP_LENGTH);
+  switch_step = clampf_local(switch_step, 0.0f, NAV_MAX_STEP_LENGTH);
+
+  if(go_step <= EPS && switch_step <= EPS) {
+    set_left_right_step_length(0.0f, 0.0f);
+    if(inner_ratio != NULL) *inner_ratio = 1.0f;
+    return;
+  }
+
+  if(go_step <= EPS) {
+    set_left_right_step_length(switch_step, switch_step);
+    if(inner_ratio != NULL) *inner_ratio = 1.0f;
+    return;
+  }
+
+  if(switch_step > EPS) {
+    float outer_step = clampf_local(go_step + switch_step, 0.0f, NAV_MAX_STEP_LENGTH);
+    float inner_step = clampf_local(go_step - switch_step, 0.0f, NAV_MAX_STEP_LENGTH);
+
+    ratio = (outer_step > EPS) ? (inner_step / outer_step) : 1.0f;
+    if(switch_speed > 0.0f) {
+      left_step = outer_step;
+      right_step = inner_step;
+    } else {
+      left_step = inner_step;
+      right_step = outer_step;
+    }
+  }
+
+  set_left_right_step_length(left_step, right_step);
+  if(inner_ratio != NULL) *inner_ratio = clampf_local(ratio, 0.0f, 1.0f);
 }
 
 void apply_curve_step_length(uint8_t dir, float base_step,float inner_ratio)

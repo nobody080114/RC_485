@@ -6,6 +6,14 @@ uint8_t COM_UART_RxData[12]; //
 extern DMA_HandleTypeDef hdma_usart1_rx;
 extern int8_t go_dir;
 int16_t switch_speed = 0, go_speed = 0;
+
+static int16_t COM_ClampSpeed(int16_t value, int16_t min_value, int16_t max_value)
+{
+    if(value < min_value) return min_value;
+    if(value > max_value) return max_value;
+    return value;
+}
+
 void COM_UART_Init(void)
 {
     HAL_UARTEx_ReceiveToIdle_DMA(&huart1, (uint8_t *)COM_UART_TempRxBuff, sizeof(COM_UART_TempRxBuff));
@@ -30,8 +38,11 @@ void COM_GetData(int8_t *go_dir)
 {
     switch_speed = (int16_t)(COM_UART_RxData[10] << 8 | COM_UART_RxData[9]);
     go_speed = (int16_t)( (uint8_t)COM_UART_RxData[6] << 8 | (uint8_t)COM_UART_RxData[5] );
-    if(switch_speed > 0 && go_speed == 0) *go_dir = 3; // Turn left
-    else if(switch_speed < 0 && go_speed == 0) *go_dir = 4; // Turn right
+    switch_speed = COM_ClampSpeed(switch_speed, -20, 20);
+    go_speed = COM_ClampSpeed(go_speed, -10, 10);
+
+    if(switch_speed > 0 && go_speed == 0) *go_dir = 3; // Turn right
+    else if(switch_speed < 0 && go_speed == 0) *go_dir = 4; // Turn left
     else if(go_speed > 0 && switch_speed == 0) *go_dir = 1; // Forward
     else if(go_speed < 0 && switch_speed == 0) *go_dir = 2; // Backward
     else if(go_speed > 0 && switch_speed > 0) *go_dir = 5; // Forward right

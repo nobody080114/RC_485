@@ -47,6 +47,8 @@ typedef struct{
     float G_0,G_1;
     uint16_t Kp_x,Kd_xt,Kd_xr;
     uint16_t Kp_y,Kd_yt,Kd_yr;
+    uint16_t Kp_x_j,Kd_xt_j,Kd_xr_j;
+    uint16_t Kp_y_j,Kd_yt_j,Kd_yr_j;
     float output_now_0,output_now_1;
     float raw_vx, raw_vy;
     float filtered_vx, filtered_vy;
@@ -73,6 +75,7 @@ bool fwd_kinematics_and_jacobian(float theta1, float theta2, bool elbow_up,
 float apply_2nd_order_lpf(float input, Filter2ndState *s);
 void estimate_foot_force(float tau1, float tau2, JacobianMatrix *J, float *Fx_real, float *Fy_real);
 void set_left_right_step_length(float left_step, float right_step);
+void nav_update_step_length(int16_t go_speed_cm_s, int16_t switch_speed_cm_s, float period, float *inner_ratio);
 void apply_curve_step_length(uint8_t dir, float base_step,float inner_ratio);
 void jump_reset(void);
 void jump_update(float dt);
