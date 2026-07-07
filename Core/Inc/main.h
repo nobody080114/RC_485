@@ -36,7 +36,7 @@ extern "C" {
 #include "tim.h"
 #include "usart.h"
 #include "gpio.h"
-
+#include "fdcan.h"
 #include "gom_protocol.h"
 #include "control.h"
 #include "motion.h"
@@ -53,6 +53,10 @@ extern "C" {
 #include <stdlib.h>
 #include <stdbool.h>
 #include "crc_ccitt.h"
+#include "dm_motor_ctrl.h"
+#include "dm_motor_drv.h"
+#include "dm_control.h"
+#include "bsp_fdcan.h"
 // #include "control.h"
 /* USER CODE END Includes */
 
@@ -79,6 +83,8 @@ void Error_Handler(void);
 /* USER CODE END EFP */
 
 /* Private defines -----------------------------------------------------------*/
+#define Power_24V_Pin GPIO_PIN_14
+#define Power_24V_GPIO_Port GPIOC
 
 /* USER CODE BEGIN Private defines */
 

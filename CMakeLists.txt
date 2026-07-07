@@ -61,6 +61,11 @@ target_sources(${CMAKE_PROJECT_NAME} PRIVATE
     Drivers/CMSIS/DSP/Source/FastMathFunctions/arm_cos_f32.c
     Drivers/CMSIS/DSP/Source/FastMathFunctions/arm_sin_f32.c
     Drivers/CMSIS/DSP/Source/CommonTables/arm_common_tables.c
+    DM/bsp_fdcan.c
+    DM/dm_motor_ctrl.c
+    DM/dm_motor_drv.c
+    DM/dm_control.c
+    DM/delay.c
 )
 
 # Add include paths
@@ -69,6 +74,7 @@ target_include_directories(${CMAKE_PROJECT_NAME} PRIVATE
     Unitree
     My_code
     Drivers/CMSIS/DSP/Include
+    DM
 )
 
 # Add project symbols (macros)

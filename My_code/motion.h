@@ -9,6 +9,15 @@
 #define L2 0.200f // m
 // #define TURN_INNER_STEP_RATIO 0.55f
 // #define TURN_OUTER_STEP_RATIO 1.00f
+typedef enum {
+    JUMP_IDLE = 0,
+    JUMP_CROUCH, //下蹲
+    JUMP_THRUST, //蹬伸
+    JUMP_FLIGHT, //腾空
+    JUMP_LAND, //落地缓冲
+    JUMP_RECOVER //恢复站立
+} JumpState;
+
 typedef struct {
     float x;
     float y;
@@ -49,6 +58,8 @@ typedef struct{
     uint16_t Kp_y,Kd_yt,Kd_yr;
     uint16_t Kp_x_j,Kd_xt_j,Kd_xr_j;
     uint16_t Kp_y_j,Kd_yt_j,Kd_yr_j;
+    uint16_t Kp_x_f,Kd_xt_f,Kd_xr_f;
+    uint16_t Kp_y_f,Kd_yt_f,Kd_yr_f;
     float output_now_0,output_now_1;
     float raw_vx, raw_vy;
     float filtered_vx, filtered_vy;
@@ -79,8 +90,8 @@ void nav_update_step_length(int16_t go_speed_cm_s, int16_t switch_speed_cm_s, fl
 void apply_curve_step_length(uint8_t dir, float base_step,float inner_ratio);
 void jump_reset(void);
 void jump_update(float dt);
-
+void jump_F_set(uint16_t speed_state);
 extern int8_t jump_start_req,jump_armed;
 extern float jump_ff_x,jump_ff_y;
-
+extern JumpState jump_state;
 #endif // MOTION_H

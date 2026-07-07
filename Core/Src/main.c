@@ -18,8 +18,8 @@
 /* USER CODE END Header */
 /* Includes ------------------------------------------------------------------*/
 #include "main.h"
-#include "control.h"
 #include "dma.h"
+#include "fdcan.h"
 #include "tim.h"
 #include "usart.h"
 #include "gpio.h"
@@ -46,9 +46,10 @@
 /* Private variables ---------------------------------------------------------*/
 
 /* USER CODE BEGIN PV */
+
 // 速度低通滤波器参数 (截止频率约 30~50Hz)
 // alpha 越小滤波越强，但延迟越大；alpha 越大越灵敏，但噪声越大。
-#define VEL_ALPHA 0.2f 
+#define VEL_ALPHA 0.9f 
 RS485_Scheduler_t rs485;
 FootTrajParam traj_param;
 Point2D P,current_P;
@@ -56,19 +57,24 @@ JointParam joint_param_0, joint_param_1, joint_param_2, joint_param_3, joint_par
 PosPID_t Pospid[8];
 float G_0 = -55.0F,G_1 = -55.0f,G_2 = -30.0f,G_3 = -30.0f;
 float time = 0.0f,dt = 0.001f;
+uint16_t dt2 = 1;
 float theta0_out = 0, theta1_out = 0;
 float go_0_pos=0,go_1_pos=0,go_2_pos=0,go_3_pos=0,go_4_pos=0,go_5_pos=0,go_6_pos=0,go_7_pos=0;
 int8_t start = 0,start_1 = 0,run  = 0,flag_1 = 1,stand_flag = 0,mode = 0,last_mode = 0,control_mode = 0,Enable = 0,go_dir = 0,stand_state = 0;
 // go_dir: 1-forward, 2-backward, 3-turn right, 4-turn left,
 //         5-forward right, 6-forward left, 7-backward right, 8-backward left
 //go_dir: 1-前进，2-后退，3-左移，4-右移
+static int8_t nav_cycle_dir = 0;
+static uint8_t nav_cycle_update_req = 1;
 uint16_t speed = 0,speed_state = 0,last_speed_state = 0;//speed_state: 0-停止，1-低速，2-中速，3-高速
 uint32_t zhen = 0,cnt = 0,cnt_tx = 0;
 uint16_t Key[10];
-float kp_x = 400.0f, kd_xt = 25.0f, kd_xr = 20.0f;
-float kp_y = 1200.0f, kd_yt = 115.0f, kd_yr = 120.0f;
-float kp_x_j = 400.0f, kd_xt_j = 25.0f, kd_xr_j = 20.0f;
-float kp_y_j = 2400.0f, kd_yt_j = 300.0f, kd_yr_j = 300.0f;
+float kp_x = 600.0f, kd_xt = 25.0f, kd_xr = 20.0f;
+float kp_y = 1200.0f, kd_yt = 115.0f, kd_yr = 120.0f;//行走
+float kp_x_j = 500.0f, kd_xt_j = 25.0f, kd_xr_j = 30.0f;
+float kp_y_j = 1200.0f, kd_yt_j = 150.0f, kd_yr_j = 300.0f;//蹬腿
+float kp_x_f = 400.0f, kd_xt_f = 25.0f, kd_xr_f = 30.0f;
+float kp_y_f = 1200.0f, kd_yt_f = 150.0f, kd_yr_f = 500.0f;//腾空
 float inner_ratio = 0.55f;
 Filter2ndState filter_w1 = {0};
 Filter2ndState filter_w2 = {0};
@@ -151,6 +157,7 @@ int main(void)
   MX_USART3_UART_Init();
   MX_UART5_Init();
   MX_USART1_UART_Init();
+  MX_FDCAN1_Init();
   /* USER CODE BEGIN 2 */
   DWT_Init();
   HAL_Delay(500);
@@ -249,7 +256,7 @@ int main(void)
   HAL_TIM_Base_Start_IT(&htim1); // 启动定时器1的中断，定时器1的周期由cubemx设置，这里是1ms
   CRSF_Init();
   COM_UART_Init();
-
+  // DM4310_Init();
   /* USER CODE END 2 */
 
   /* Infinite loop */
@@ -259,22 +266,45 @@ int main(void)
     /* USER CODE END WHILE */
 
     /* USER CODE BEGIN 3 */
-    foot_motion_0.Kp_x = kp_x; foot_motion_0.Kd_xt = kd_xt; foot_motion_0.Kd_xr = kd_xr;
-    foot_motion_1.Kp_x = kp_x; foot_motion_1.Kd_xt = kd_xt; foot_motion_1.Kd_xr = kd_xr;
-    foot_motion_2.Kp_x = kp_x; foot_motion_2.Kd_xt = kd_xt; foot_motion_2.Kd_xr = kd_xr;
-    foot_motion_3.Kp_x = kp_x; foot_motion_3.Kd_xt = kd_xt; foot_motion_3.Kd_xr = kd_xr;
-    foot_motion_0.Kp_y = kp_y; foot_motion_0.Kd_yt = kd_yt; foot_motion_0.Kd_yr = kd_yr;
-    foot_motion_1.Kp_y = kp_y; foot_motion_1.Kd_yt = kd_yt; foot_motion_1.Kd_yr = kd_yr;
-    foot_motion_2.Kp_y = kp_y; foot_motion_2.Kd_yt = kd_yt; foot_motion_2.Kd_yr = kd_yr;
-    foot_motion_3.Kp_y = kp_y; foot_motion_3.Kd_yt = kd_yt; foot_motion_3.Kd_yr = kd_yr;
-    foot_motion_0.Kp_x_j = kp_x_j; foot_motion_0.Kd_xt_j = kd_xt_j; foot_motion_0.Kd_xr_j = kd_xr_j;
-    foot_motion_1.Kp_x_j = kp_x_j; foot_motion_1.Kd_xt_j = kd_xt_j; foot_motion_1.Kd_xr_j = kd_xr_j;
-    foot_motion_2.Kp_x_j = kp_x_j; foot_motion_2.Kd_xt_j = kd_xt_j; foot_motion_2.Kd_xr_j = kd_xr_j;
-    foot_motion_3.Kp_x_j = kp_x_j; foot_motion_3.Kd_xt_j = kd_xt_j; foot_motion_3.Kd_xr_j = kd_xr_j;
-    foot_motion_0.Kp_y_j = kp_y_j; foot_motion_0.Kd_yt_j = kd_yt_j; foot_motion_0.Kd_yr_j = kd_yr_j;
-    foot_motion_1.Kp_y_j = kp_y_j; foot_motion_1.Kd_yt_j = kd_yt_j; foot_motion_1.Kd_yr_j = kd_yr_j;
-    foot_motion_2.Kp_y_j = kp_y_j; foot_motion_2.Kd_yt_j = kd_yt_j; foot_motion_2.Kd_yr_j = kd_yr_j;
-    foot_motion_3.Kp_y_j = kp_y_j; foot_motion_3.Kd_yt_j = kd_yt_j; foot_motion_3.Kd_yr_j = kd_yr_j;
+    
+    if(control_mode == 0||control_mode == 2)
+    {
+      // DM_Ctrl();
+      foot_motion_0.Kp_x = kp_x; foot_motion_0.Kd_xt = kd_xt; foot_motion_0.Kd_xr = kd_xr;
+      foot_motion_1.Kp_x = kp_x; foot_motion_1.Kd_xt = kd_xt; foot_motion_1.Kd_xr = kd_xr;
+      foot_motion_2.Kp_x = kp_x; foot_motion_2.Kd_xt = kd_xt; foot_motion_2.Kd_xr = kd_xr;
+      foot_motion_3.Kp_x = kp_x; foot_motion_3.Kd_xt = kd_xt; foot_motion_3.Kd_xr = kd_xr;
+      foot_motion_0.Kp_y = kp_y; foot_motion_0.Kd_yt = kd_yt; foot_motion_0.Kd_yr = kd_yr;
+      foot_motion_1.Kp_y = kp_y; foot_motion_1.Kd_yt = kd_yt; foot_motion_1.Kd_yr = kd_yr;
+      foot_motion_2.Kp_y = kp_y; foot_motion_2.Kd_yt = kd_yt; foot_motion_2.Kd_yr = kd_yr;
+      foot_motion_3.Kp_y = kp_y; foot_motion_3.Kd_yt = kd_yt; foot_motion_3.Kd_yr = kd_yr;
+    }
+    else
+    {
+      if(jump_state == JUMP_CROUCH||jump_state == JUMP_THRUST||jump_state == JUMP_RECOVER||jump_state == JUMP_LAND||jump_state == JUMP_IDLE)
+      {
+        foot_motion_0.Kp_x_j = kp_x_j; foot_motion_0.Kd_xt_j = kd_xt_j; foot_motion_0.Kd_xr_j = kd_xr_j;
+        foot_motion_1.Kp_x_j = kp_x_j; foot_motion_1.Kd_xt_j = kd_xt_j; foot_motion_1.Kd_xr_j = kd_xr_j;
+        foot_motion_2.Kp_x_j = kp_x_j; foot_motion_2.Kd_xt_j = kd_xt_j; foot_motion_2.Kd_xr_j = kd_xr_j;
+        foot_motion_3.Kp_x_j = kp_x_j; foot_motion_3.Kd_xt_j = kd_xt_j; foot_motion_3.Kd_xr_j = kd_xr_j;
+        foot_motion_0.Kp_y_j = kp_y_j; foot_motion_0.Kd_yt_j = kd_yt_j; foot_motion_0.Kd_yr_j = kd_yr_j;
+        foot_motion_1.Kp_y_j = kp_y_j; foot_motion_1.Kd_yt_j = kd_yt_j; foot_motion_1.Kd_yr_j = kd_yr_j;
+        foot_motion_2.Kp_y_j = kp_y_j; foot_motion_2.Kd_yt_j = kd_yt_j; foot_motion_2.Kd_yr_j = kd_yr_j;
+        foot_motion_3.Kp_y_j = kp_y_j; foot_motion_3.Kd_yt_j = kd_yt_j; foot_motion_3.Kd_yr_j = kd_yr_j;
+      }
+      else if(jump_state == JUMP_FLIGHT)
+      {
+        foot_motion_0.Kp_x_f = kp_x_f; foot_motion_0.Kd_xt_f = kd_xt_f; foot_motion_0.Kd_xr_f = kd_xr_f;
+        foot_motion_1.Kp_x_f = kp_x_f; foot_motion_1.Kd_xt_f = kd_xt_f; foot_motion_1.Kd_xr_f = kd_xr_f;
+        foot_motion_2.Kp_x_f = kp_x_f; foot_motion_2.Kd_xt_f = kd_xt_f; foot_motion_2.Kd_xr_f = kd_xr_f;
+        foot_motion_3.Kp_x_f = kp_x_f; foot_motion_3.Kd_xt_f = kd_xt_f; foot_motion_3.Kd_xr_f = kd_xr_f;
+        foot_motion_0.Kp_y_f = kp_y_f; foot_motion_0.Kd_yt_f = kd_yt_f; foot_motion_0.Kd_yr_f = kd_yr_f;
+        foot_motion_1.Kp_y_f = kp_y_f; foot_motion_1.Kd_yt_f = kd_yt_f; foot_motion_1.Kd_yr_f = kd_yr_f;
+        foot_motion_2.Kp_y_f = kp_y_f; foot_motion_2.Kd_yt_f = kd_yt_f; foot_motion_2.Kd_yr_f = kd_yr_f;
+        foot_motion_3.Kp_y_f = kp_y_f; foot_motion_3.Kd_yt_f = kd_yt_f; foot_motion_3.Kd_yr_f = kd_yr_f;
+      }
+    }
+
     RS485_Schedule(&rs485);
     CRSF_Schedule();
     if(Enable)
@@ -335,6 +365,7 @@ int main(void)
             }
             else if(control_mode == 1)
             {
+                // jump_F_set(speed_state);
                 PosPID_Set(&cmd_0,0.0f, 0.0f);  
                 PosPID_Set(&cmd_1,0.0f, 0.0f);
                 PosPID_Set(&cmd_2,0.0f, 0.0f);
@@ -392,7 +423,7 @@ void SystemClock_Config(void)
   RCC_OscInitStruct.PLL.PLLM = 3;
   RCC_OscInitStruct.PLL.PLLN = 68;
   RCC_OscInitStruct.PLL.PLLP = 1;
-  RCC_OscInitStruct.PLL.PLLQ = 2;
+  RCC_OscInitStruct.PLL.PLLQ = 4;
   RCC_OscInitStruct.PLL.PLLR = 2;
   RCC_OscInitStruct.PLL.PLLRGE = RCC_PLL1VCIRANGE_3;
   RCC_OscInitStruct.PLL.PLLVCOSEL = RCC_PLL1VCOWIDE;
@@ -429,6 +460,10 @@ void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim)
     {
         static uint16_t count = 0;
         static uint16_t count_1 = 0;
+        // if(control_mode == 2)
+        // {
+          // DM_upset(dt2);
+        // }
         count_1++;
         if(count_1>=1000)
         {
@@ -498,15 +533,28 @@ void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim)
         {
             if((run == 1))
             {   
+                int8_t cycle_go_dir = go_dir;
                 last_speed_state = speed_state;
                 if(control_mode == 2)
                 {
-                  nav_update_step_length(go_speed, switch_speed, traj_param.period, &inner_ratio);
-                  if(go_dir == 0) speed_state = 0;
+                  if(mode != 2) {
+                    nav_cycle_dir = 0;
+                    nav_cycle_update_req = 1;
+                  }
+                  if(mode == 2 && (nav_cycle_update_req || nav_cycle_dir == 0))
+                  {
+                    nav_update_step_length(go_speed, switch_speed, traj_param.period, &inner_ratio);
+                    nav_cycle_dir = go_dir;
+                    nav_cycle_update_req = 0;
+                  }
+                  cycle_go_dir = nav_cycle_dir;
+                  if(cycle_go_dir == 0) speed_state = 0;
                   else speed_state = 1;
                 }
                 else
                 {
+                  nav_cycle_dir = 0;
+                  nav_cycle_update_req = 1;
                   if(speed>=1100) 
                   {
                     foot_motion_0.track.step_length  = 0.100f;
@@ -551,37 +599,54 @@ void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim)
                     cmd_6.Pos = output_to_rotor(0, &joint_param_6); 
                     cmd_7.Pos = output_to_rotor(-PI, &joint_param_7); 
                     time = 0.0f;
+                    if(control_mode == 2) nav_cycle_update_req = 1;
                     // stand_flag = 1;
                   }
                   if(mode == 2)
                   {
-                      if(go_dir == 1 || go_dir == 5 || go_dir == 6||go_dir == 3 || go_dir == 4) 
+                      if(cycle_go_dir == 1 || cycle_go_dir == 5 || cycle_go_dir == 6||cycle_go_dir == 3 || cycle_go_dir == 4)
                       {
                         time += dt; 
-                        if(time > traj_param.period) time -= traj_param.period;
+                        if(time > traj_param.period) {
+                          time -= traj_param.period;
+                          if(control_mode == 2) {
+                            nav_update_step_length(go_speed, switch_speed, traj_param.period, &inner_ratio);
+                            nav_cycle_dir = go_dir;
+                            nav_cycle_update_req = 0;
+                            cycle_go_dir = nav_cycle_dir;
+                          }
+                        }
                         else if(time < 0) time += traj_param.period;
                       }//前进             
-                      else if(go_dir == 2 || go_dir == 7 || go_dir == 8) 
+                      else if(cycle_go_dir == 2 || cycle_go_dir == 7 || cycle_go_dir == 8)
                       {
                         time -= dt;
                         if(time > traj_param.period) time -= traj_param.period;
-                        else if(time < 0) time += traj_param.period;
+                        else if(time < 0) {
+                          time += traj_param.period;
+                          if(control_mode == 2) {
+                            nav_update_step_length(go_speed, switch_speed, traj_param.period, &inner_ratio);
+                            nav_cycle_dir = go_dir;
+                            nav_cycle_update_req = 0;
+                            cycle_go_dir = nav_cycle_dir;
+                          }
+                        }
                       }//后退
-                      if(go_dir == 1 || go_dir == 2 || (go_dir >= 5 && go_dir <= 8))
+                      if(cycle_go_dir == 1 || cycle_go_dir == 2 || (cycle_go_dir >= 5 && cycle_go_dir <= 8))
                       {
                         foot_ellipse_trajectory(time, &foot_motion_0, &traj_param);  //左前
                         foot_ellipse_trajectory((time+traj_param.period/2.0f), &foot_motion_1, &traj_param); //右前
                         foot_ellipse_trajectory(time, &foot_motion_2, &traj_param);  //2右后
                         foot_ellipse_trajectory((time+traj_param.period/2.0f), &foot_motion_3, &traj_param); //3左后
                       }
-                      if(go_dir == 3)
+                      if(cycle_go_dir == 3)
                       {
                         foot_ellipse_trajectory_dir(time, &foot_motion_0, &traj_param, 1.0f);
                         foot_ellipse_trajectory_dir((time+traj_param.period/2.0f), &foot_motion_1, &traj_param, -1.0f); 
                         foot_ellipse_trajectory_dir(time, &foot_motion_2, &traj_param, -1.0f);
                         foot_ellipse_trajectory_dir((time+traj_param.period/2.0f), &foot_motion_3, &traj_param, 1.0f);                                                                       
                       }
-                      else if(go_dir == 4)
+                      else if(cycle_go_dir == 4)
                       {
                         foot_ellipse_trajectory_dir(time, &foot_motion_0, &traj_param, -1.0f);
                         foot_ellipse_trajectory_dir((time+traj_param.period/2.0f), &foot_motion_1, &traj_param, 1.0f); 
@@ -756,8 +821,16 @@ void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim)
                     }
                     else if(mode == 3)
                     {
-                      foot_motion_0.Fx = jump_ff_x + foot_motion_0.Kp_x_j * (foot_motion_0.P.x - foot_motion_0.current_P.x)+ foot_motion_0.Kd_xt * foot_motion_0.target_vx - foot_motion_0.Kd_xr*foot_motion_0.filtered_vx;
-                      foot_motion_0.Fy = jump_ff_y + foot_motion_0.Kp_y_j * (foot_motion_0.P.y - foot_motion_0.current_P.y)+ foot_motion_0.Kd_yt * foot_motion_0.target_vy - foot_motion_0.Kd_yr*foot_motion_0.filtered_vy;
+                      if(jump_state == JUMP_CROUCH||jump_state == JUMP_THRUST||jump_state == JUMP_RECOVER||jump_state == JUMP_LAND||jump_state == JUMP_IDLE) 
+                      {
+                        foot_motion_0.Fx = jump_ff_x + foot_motion_0.Kp_x_j * (foot_motion_0.P.x - foot_motion_0.current_P.x)+ foot_motion_0.Kd_xt * foot_motion_0.target_vx - foot_motion_0.Kd_xr*foot_motion_0.filtered_vx;
+                        foot_motion_0.Fy = jump_ff_y + foot_motion_0.Kp_y_j * (foot_motion_0.P.y - foot_motion_0.current_P.y)+ foot_motion_0.Kd_yt * foot_motion_0.target_vy - foot_motion_0.Kd_yr*foot_motion_0.filtered_vy;
+                      }
+                      else if(jump_state == JUMP_FLIGHT)
+                      {
+                        foot_motion_0.Fx = jump_ff_x + foot_motion_0.Kp_x_f * (foot_motion_0.P.x - foot_motion_0.current_P.x)+ foot_motion_0.Kd_xt * foot_motion_0.target_vx - foot_motion_0.Kd_xr*foot_motion_0.filtered_vx;
+                        foot_motion_0.Fy = jump_ff_y + foot_motion_0.Kp_y_f * (foot_motion_0.P.y - foot_motion_0.current_P.y)+ foot_motion_0.Kd_yt * foot_motion_0.target_vy - foot_motion_0.Kd_yr*foot_motion_0.filtered_vy;
+                      }
                     }
                     foot_motion_0.target_tau1 = (foot_motion_0.J.J00 * foot_motion_0.Fx + foot_motion_0.J.J10 * foot_motion_0.Fy)* joint_param_1.dir / joint_param_1.ratio;
                     foot_motion_0.target_tau2 = (foot_motion_0.J.J01 * foot_motion_0.Fx + foot_motion_0.J.J11 * foot_motion_0.Fy)* joint_param_0.dir / joint_param_0.ratio;
@@ -781,8 +854,16 @@ void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim)
                     }
                     else if(mode == 3)
                     {
-                      foot_motion_1.Fx = jump_ff_x + foot_motion_1.Kp_x_j * (foot_motion_1.P.x - foot_motion_1.current_P.x)+ foot_motion_1.Kd_xt * foot_motion_1.target_vx - foot_motion_1.Kd_xr*foot_motion_1.filtered_vx;
-                      foot_motion_1.Fy = jump_ff_y + foot_motion_1.Kp_y_j * (foot_motion_1.P.y - foot_motion_1.current_P.y)+ foot_motion_1.Kd_yt * foot_motion_1.target_vy - foot_motion_1.Kd_yr*foot_motion_1.filtered_vy;
+                      if(jump_state == JUMP_CROUCH||jump_state == JUMP_THRUST||jump_state == JUMP_RECOVER||jump_state == JUMP_LAND||jump_state == JUMP_IDLE)
+                      {
+                        foot_motion_1.Fx = jump_ff_x + foot_motion_1.Kp_x_j * (foot_motion_1.P.x - foot_motion_1.current_P.x)+ foot_motion_1.Kd_xt * foot_motion_1.target_vx - foot_motion_1.Kd_xr*foot_motion_1.filtered_vx;
+                        foot_motion_1.Fy = jump_ff_y + foot_motion_1.Kp_y_j * (foot_motion_1.P.y - foot_motion_1.current_P.y)+ foot_motion_1.Kd_yt * foot_motion_1.target_vy - foot_motion_1.Kd_yr*foot_motion_1.filtered_vy;
+                      }
+                      else if(jump_state == JUMP_FLIGHT)
+                      {
+                        foot_motion_1.Fx = jump_ff_x + foot_motion_1.Kp_x_f * (foot_motion_1.P.x - foot_motion_1.current_P.x)+ foot_motion_1.Kd_xt * foot_motion_1.target_vx - foot_motion_1.Kd_xr*foot_motion_1.filtered_vx;
+                        foot_motion_1.Fy = jump_ff_y + foot_motion_1.Kp_y_f * (foot_motion_1.P.y - foot_motion_1.current_P.y)+ foot_motion_1.Kd_yt * foot_motion_1.target_vy - foot_motion_1.Kd_yr*foot_motion_1.filtered_vy;
+                      }
                     }
                     foot_motion_1.target_tau1 = (foot_motion_1.J.J00 * foot_motion_1.Fx + foot_motion_1.J.J10 * foot_motion_1.Fy)* joint_param_3.dir / joint_param_3.ratio;
                     foot_motion_1.target_tau2 = (foot_motion_1.J.J01 * foot_motion_1.Fx + foot_motion_1.J.J11 * foot_motion_1.Fy)* joint_param_2.dir / joint_param_2.ratio;
@@ -806,8 +887,16 @@ void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim)
                     }
                     else if(mode == 3)
                     {
-                      foot_motion_2.Fx = jump_ff_x + foot_motion_2.Kp_x_j * (foot_motion_2.P.x - foot_motion_2.current_P.x)+ foot_motion_2.Kd_xt * foot_motion_2.target_vx - foot_motion_2.Kd_xr*foot_motion_2.filtered_vx;
-                      foot_motion_2.Fy = jump_ff_y + foot_motion_2.Kp_y_j * (foot_motion_2.P.y - foot_motion_2.current_P.y)+ foot_motion_2.Kd_yt * foot_motion_2.target_vy - foot_motion_2.Kd_yr*foot_motion_2.filtered_vy;
+                      if(jump_state == JUMP_CROUCH||jump_state == JUMP_THRUST||jump_state == JUMP_RECOVER||jump_state == JUMP_LAND||jump_state == JUMP_IDLE)
+                      {
+                        foot_motion_2.Fx = jump_ff_x + foot_motion_2.Kp_x_j * (foot_motion_2.P.x - foot_motion_2.current_P.x)+ foot_motion_2.Kd_xt * foot_motion_2.target_vx - foot_motion_2.Kd_xr*foot_motion_2.filtered_vx;
+                        foot_motion_2.Fy = jump_ff_y + foot_motion_2.Kp_y_j * (foot_motion_2.P.y - foot_motion_2.current_P.y)+ foot_motion_2.Kd_yt * foot_motion_2.target_vy - foot_motion_2.Kd_yr*foot_motion_2.filtered_vy;
+                      }
+                      else if(jump_state == JUMP_FLIGHT)
+                      {
+                        foot_motion_2.Fx = jump_ff_x + foot_motion_2.Kp_x_f * (foot_motion_2.P.x - foot_motion_2.current_P.x)+ foot_motion_2.Kd_xt * foot_motion_2.target_vx - foot_motion_2.Kd_xr*foot_motion_2.filtered_vx;
+                        foot_motion_2.Fy = jump_ff_y + foot_motion_2.Kp_y_f * (foot_motion_2.P.y - foot_motion_2.current_P.y)+ foot_motion_2.Kd_yt * foot_motion_2.target_vy - foot_motion_2.Kd_yr*foot_motion_2.filtered_vy;
+                      }
                     }
                     foot_motion_2.target_tau1 = (foot_motion_2.J.J00 * foot_motion_2.Fx + foot_motion_2.J.J10 * foot_motion_2.Fy)* joint_param_5.dir / joint_param_5.ratio;
                     foot_motion_2.target_tau2 = (foot_motion_2.J.J01 * foot_motion_2.Fx + foot_motion_2.J.J11 * foot_motion_2.Fy)* joint_param_4.dir / joint_param_4.ratio;
@@ -831,8 +920,16 @@ void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim)
                     }
                     else if(mode == 3)
                     {
-                      foot_motion_3.Fx = jump_ff_x + foot_motion_3.Kp_x_j * (foot_motion_3.P.x - foot_motion_3.current_P.x)+ foot_motion_3.Kd_xt * foot_motion_3.target_vx - foot_motion_3.Kd_xr*foot_motion_3.filtered_vx;
-                      foot_motion_3.Fy = jump_ff_y + foot_motion_3.Kp_y_j * (foot_motion_3.P.y - foot_motion_3.current_P.y)+ foot_motion_3.Kd_yt * foot_motion_3.target_vy - foot_motion_3.Kd_yr*foot_motion_3.filtered_vy;
+                      if(jump_state == JUMP_CROUCH||jump_state == JUMP_THRUST||jump_state == JUMP_RECOVER||jump_state == JUMP_LAND||jump_state == JUMP_IDLE) 
+                      {
+                        foot_motion_3.Fx = jump_ff_x + foot_motion_3.Kp_x_j * (foot_motion_3.P.x - foot_motion_3.current_P.x)+ foot_motion_3.Kd_xt * foot_motion_3.target_vx - foot_motion_3.Kd_xr*foot_motion_3.filtered_vx;
+                        foot_motion_3.Fy = jump_ff_y + foot_motion_3.Kp_y_j * (foot_motion_3.P.y - foot_motion_3.current_P.y)+ foot_motion_3.Kd_yt * foot_motion_3.target_vy - foot_motion_3.Kd_yr*foot_motion_3.filtered_vy;
+                      }
+                      else if(jump_state == JUMP_FLIGHT)
+                      {
+                        foot_motion_3.Fx = jump_ff_x + foot_motion_3.Kp_x_f * (foot_motion_3.P.x - foot_motion_3.current_P.x)+ foot_motion_3.Kd_xt * foot_motion_3.target_vx - foot_motion_3.Kd_xr*foot_motion_3.filtered_vx;
+                        foot_motion_3.Fy = jump_ff_y + foot_motion_3.Kp_y_f * (foot_motion_3.P.y - foot_motion_3.current_P.y)+ foot_motion_3.Kd_yt * foot_motion_3.target_vy - foot_motion_3.Kd_yr*foot_motion_3.filtered_vy;
+                      }
                     }
                     foot_motion_3.target_tau1 = (foot_motion_3.J.J00 * foot_motion_3.Fx + foot_motion_3.J.J10 * foot_motion_3.Fy)* joint_param_6.dir / joint_param_6.ratio;
                     foot_motion_3.target_tau2 = (foot_motion_3.J.J01 * foot_motion_3.Fx + foot_motion_3.J.J11 * foot_motion_3.Fy)* joint_param_7.dir / joint_param_7.ratio;

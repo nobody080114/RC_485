@@ -2,6 +2,7 @@
     正运动结算
 */
 #include "motion.h"
+#include <stdint.h>
 
 #define EPS 1e-6f
 
@@ -18,18 +19,18 @@ float JUMP_STAND_Y        = -0.173f;  // 站立高度，作为跳跃前后默认
 float JUMP_CROUCH_X       = 0.000f;   // 下蹲阶段足端 x 位置，通常保持中位。
 float JUMP_CROUCH_Y       = -0.100f;  // 下蹲高度，越接近 0 腿收得越短，蓄力空间越大。
 float JUMP_THRUST_X       = -0.100f;  // 蹬伸阶段足端向后目标，越负向前跳得越远。
-float JUMP_THRUST_Y       = -0.270f;  // 蹬伸阶段腿伸长目标，越负向上蹬地越强。
+float JUMP_THRUST_Y       = -0.250f;  // 蹬伸阶段腿伸长目标，越负向上蹬地越强。
 float JUMP_FLIGHT_X       = 0.040f;   // 腾空阶段收腿向前摆的位置，用于准备落地。
-float JUMP_FLIGHT_Y       = -0.07f;  // 腾空阶段收腿高度，越接近 0 越不容易拖地。
+float JUMP_FLIGHT_Y       = -0.13f;  // 腾空阶段收腿高度，越接近 0 越不容易拖地。
 float JUMP_LAND_X         = 0.000f;   // 落地缓冲阶段足端 x 回中。
 float JUMP_LAND_Y         = -0.180f;  // 落地缓冲腿长，略低于站立高度用于吸收冲击。
 float JUMP_CROUCH_TIME    = 0.120f;   // 下蹲持续时间，过短会蓄力不足，过长动作拖沓。
 float JUMP_THRUST_TIME    = 0.110f;   // 蹬伸持续时间，增大可提高跳高/跳远，但过大会冲击大。
-float JUMP_FLIGHT_TIME    = 1.00f;   // 腾空最长等待时间，超时会强制进入落地缓冲。
-float JUMP_LAND_TIME      = 1.0f;   // 落地缓冲持续时间，增大可更软但恢复更慢。
+float JUMP_FLIGHT_TIME    = 0.40f;   // 腾空最长等待时间，超时会强制进入落地缓冲。
+float JUMP_LAND_TIME      = 0.5f;   // 落地缓冲持续时间，增大可更软但恢复更慢。
 float JUMP_RECOVER_TIME   = 0.150f;   // 从落地缓冲恢复到站立的时间。
-float JUMP_THRUST_FF_X    = -50.0f;   // 蹬伸 x 方向前馈，越负向前冲量越大。
-float JUMP_THRUST_FF_Y    = -350.0f;   // 蹬伸 y 方向前馈，越负向上蹬地越强。
+float JUMP_THRUST_FF_X    = -20.0f;   // 蹬伸 x 方向前馈，越负向前冲量越大。
+float JUMP_THRUST_FF_Y    = -150.0f;   // 蹬伸 y 方向前馈，越负向上蹬地越强。
 float JUMP_LAND_FF_Y      = -8.0f;    // 落地阶段 y 方向轻微支撑前馈，用于辅助缓冲。
 float JUMP_LAND_Y_DETECT  = -0.160f;  // 落地检测阈值，至少两腿 current_P.y 大于该值认为触地。
 
@@ -37,19 +38,12 @@ float JUMP_LAND_Y_DETECT  = -0.160f;  // 落地检测阈值，至少两腿 curre
 #define NAV_SWITCH_SPEED_LIMIT_CM_S 20.0f
 #define NAV_MAX_STEP_LENGTH          0.120f
 
-typedef enum {
-    JUMP_IDLE = 0,
-    JUMP_CROUCH, //下蹲
-    JUMP_THRUST, //蹬伸
-    JUMP_FLIGHT, //腾空
-    JUMP_LAND, //落地缓冲
-    JUMP_RECOVER //恢复站立
-} JumpState;
+
 
 int8_t jump_start_req = 0, jump_armed = 1;
 float jump_ff_x = 0.0f, jump_ff_y = 0.0f;
 
-static JumpState jump_state = JUMP_IDLE;
+JumpState jump_state = JUMP_IDLE;
 static float jump_state_time = 0.0f;
 static float jump_start_x = 0.000f;
 static float jump_start_y = -0.173f;
@@ -126,6 +120,67 @@ void jump_reset(void)
     jump_ff_y = 0.0f;
 }
 
+void jump_F_set(uint16_t speed_state)
+{
+    if(speed_state == 3)
+    {
+        JUMP_CROUCH_X       = 0.000f;   // 下蹲阶段足端 x 位置，通常保持中位。
+        JUMP_CROUCH_Y       = -0.100f;  // 下蹲高度，越接近 0 腿收得越短，蓄力空间越大。
+        JUMP_THRUST_X       = -0.100f;  // 蹬伸阶段足端向后目标，越负向前跳得越远。
+        JUMP_THRUST_Y       = -0.250f;  // 蹬伸阶段腿伸长目标，越负向上蹬地越强。
+        JUMP_FLIGHT_X       = 0.040f;   // 腾空阶段收腿向前摆的位置，用于准备落地。
+        JUMP_FLIGHT_Y       = -0.07f;  // 腾空阶段收腿高度，越接近 0 越不容易拖地。
+        JUMP_LAND_X         = 0.000f;   // 落地缓冲阶段足端 x 回中。
+        JUMP_LAND_Y         = -0.180f;  // 落地缓冲腿长，略低于站立高度用于吸收冲击。
+        JUMP_CROUCH_TIME    = 0.120f;   // 下蹲持续时间，过短会蓄力不足，过长动作拖沓。
+        JUMP_THRUST_TIME    = 0.110f;   // 蹬伸持续时间，增大可提高跳高/跳远，但过大会冲击大。
+        JUMP_FLIGHT_TIME    = 1.00f;   // 腾空最长等待时间，超时会强制进入落地缓冲。
+        JUMP_LAND_TIME      = 1.0f;   // 落地缓冲持续时间，增大可更软但恢复更慢。
+        JUMP_RECOVER_TIME   = 0.150f;   // 从落地缓冲恢复到站立的时间。
+        JUMP_THRUST_FF_X    = -50.0f;   // 蹬伸 x 方向前馈，越负向前冲量越大。
+        JUMP_THRUST_FF_Y    = -300.0f;   // 蹬伸 y 方向前馈，越负向上蹬地越强。
+    }
+    else if(speed_state == 2)
+    {
+        // 跳跃足端目标参数，单位：x/y 为 m，time 为 s，前馈力为 N。
+        // 坐标约定：y 越负腿越伸长；x 越负表示足端向后蹬，机体获得向前趋势。
+        JUMP_CROUCH_X       = 0.000f;   // 下蹲阶段足端 x 位置，通常保持中位。
+        JUMP_CROUCH_Y       = -0.100f;  // 下蹲高度，越接近 0 腿收得越短，蓄力空间越大。
+        JUMP_THRUST_X       = -0.100f;  // 蹬伸阶段足端向后目标，越负向前跳得越远。
+        JUMP_THRUST_Y       = -0.250f;  // 蹬伸阶段腿伸长目标，越负向上蹬地越强。
+        JUMP_FLIGHT_X       = 0.040f;   // 腾空阶段收腿向前摆的位置，用于准备落地。
+        JUMP_FLIGHT_Y       = -0.13f;  // 腾空阶段收腿高度，越接近 0 越不容易拖地。
+        JUMP_LAND_X         = 0.000f;   // 落地缓冲阶段足端 x 回中。
+        JUMP_LAND_Y         = -0.180f;  // 落地缓冲腿长，略低于站立高度用于吸收冲击。
+        JUMP_CROUCH_TIME    = 0.120f;   // 下蹲持续时间，过短会蓄力不足，过长动作拖沓。
+        JUMP_THRUST_TIME    = 0.110f;   // 蹬伸持续时间，增大可提高跳高/跳远，但过大会冲击大。
+        JUMP_FLIGHT_TIME    = 0.40f;   // 腾空最长等待时间，超时会强制进入落地缓冲。
+        JUMP_LAND_TIME      = 0.5f;   // 落地缓冲持续时间，增大可更软但恢复更慢。
+        JUMP_RECOVER_TIME   = 0.150f;   // 从落地缓冲恢复到站立的时间。
+        JUMP_THRUST_FF_X    = -20.0f;   // 蹬伸 x 方向前馈，越负向前冲量越大。
+        JUMP_THRUST_FF_Y    = -150.0f;   // 蹬伸 y 方向前馈，越负向上蹬地越强。
+    }
+    else if (speed_state == 1)
+    {
+        // 跳跃足端目标参数，单位：x/y 为 m，time 为 s，前馈力为 N。
+        // 坐标约定：y 越负腿越伸长；x 越负表示足端向后蹬，机体获得向前趋势。
+        JUMP_CROUCH_X       = 0.000f;   // 下蹲阶段足端 x 位置，通常保持中位。
+        JUMP_CROUCH_Y       = -0.100f;  // 下蹲高度，越接近 0 腿收得越短，蓄力空间越大。
+        JUMP_THRUST_X       = -0.100f;  // 蹬伸阶段足端向后目标，越负向前跳得越远。
+        JUMP_THRUST_Y       = -0.250f;  // 蹬伸阶段腿伸长目标，越负向上蹬地越强。
+        JUMP_FLIGHT_X       = 0.040f;   // 腾空阶段收腿向前摆的位置，用于准备落地。
+        JUMP_FLIGHT_Y       = -0.13f;  // 腾空阶段收腿高度，越接近 0 越不容易拖地。
+        JUMP_LAND_X         = 0.000f;   // 落地缓冲阶段足端 x 回中。
+        JUMP_LAND_Y         = -0.180f;  // 落地缓冲腿长，略低于站立高度用于吸收冲击。
+        JUMP_CROUCH_TIME    = 0.120f;   // 下蹲持续时间，过短会蓄力不足，过长动作拖沓。
+        JUMP_THRUST_TIME    = 0.110f;   // 蹬伸持续时间，增大可提高跳高/跳远，但过大会冲击大。
+        JUMP_FLIGHT_TIME    = 0.40f;   // 腾空最长等待时间，超时会强制进入落地缓冲。
+        JUMP_LAND_TIME      = 0.5f;   // 落地缓冲持续时间，增大可更软但恢复更慢。
+        JUMP_RECOVER_TIME   = 0.150f;   // 从落地缓冲恢复到站立的时间。
+        JUMP_THRUST_FF_X    = -20.0f;   // 蹬伸 x 方向前馈，越负向前冲量越大。
+        JUMP_THRUST_FF_Y    = -150.0f;   // 蹬伸 y 方向前馈，越负向上蹬地越强。
+    }
+}
 void jump_update(float dt)
 {
     float duration = JUMP_RECOVER_TIME;
