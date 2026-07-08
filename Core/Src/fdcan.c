@@ -96,7 +96,7 @@ void HAL_FDCAN_MspInit(FDCAN_HandleTypeDef* fdcanHandle)
     PeriphClkInitStruct.PLL2.PLL2R = 2;
     PeriphClkInitStruct.PLL2.PLL2RGE = RCC_PLL2VCIRANGE_2;
     PeriphClkInitStruct.PLL2.PLL2VCOSEL = RCC_PLL2VCOWIDE;
-    PeriphClkInitStruct.PLL2.PLL2FRACN = 0.0;
+    PeriphClkInitStruct.PLL2.PLL2FRACN = 0;
     PeriphClkInitStruct.FdcanClockSelection = RCC_FDCANCLKSOURCE_PLL2;
     if (HAL_RCCEx_PeriphCLKConfig(&PeriphClkInitStruct) != HAL_OK)
     {
@@ -119,11 +119,11 @@ void HAL_FDCAN_MspInit(FDCAN_HandleTypeDef* fdcanHandle)
     HAL_GPIO_Init(GPIOD, &GPIO_InitStruct);
 
     /* FDCAN1 interrupt Init */
-    HAL_NVIC_SetPriority(FDCAN1_IT0_IRQn, 0, 0);
+    HAL_NVIC_SetPriority(FDCAN1_IT0_IRQn, 6, 0);
     HAL_NVIC_EnableIRQ(FDCAN1_IT0_IRQn);
-    HAL_NVIC_SetPriority(FDCAN1_IT1_IRQn, 0, 0);
+    HAL_NVIC_SetPriority(FDCAN1_IT1_IRQn, 6, 0);
     HAL_NVIC_EnableIRQ(FDCAN1_IT1_IRQn);
-    HAL_NVIC_SetPriority(FDCAN_CAL_IRQn, 0, 0);
+    HAL_NVIC_SetPriority(FDCAN_CAL_IRQn, 6, 0);
     HAL_NVIC_EnableIRQ(FDCAN_CAL_IRQn);
   /* USER CODE BEGIN FDCAN1_MspInit 1 */
 

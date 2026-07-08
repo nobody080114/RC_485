@@ -4,10 +4,10 @@ __attribute__((section(".RAM_D2")))
 static uint8_t COM_UART_TempRxBuff[11];
 uint8_t COM_UART_RxData[11]; //
 extern DMA_HandleTypeDef hdma_usart1_rx;
-extern int8_t go_dir;
+extern int8_t go_dir,set_flag;
 int16_t switch_speed = 0, go_speed = 0;
 float angle;
-uint8_t turn = 0, set_flag = 0;
+uint8_t turn = 0;
 static int16_t COM_ClampSpeed(int16_t value, int16_t min_value, int16_t max_value)
 {
     if(value < min_value) return min_value;
@@ -35,7 +35,7 @@ void COM_UART_Handle(void)
     // COM_GetData(&go_dir);
 }
 
-void COM_GetData(int8_t *go_dir,float *angle,uint8_t *turn,uint8_t *set_flag)
+void COM_GetData(int8_t *go_dir,float *angle,uint8_t *turn,int8_t *set_flag)
 {
     switch_speed = (int16_t)(COM_UART_RxData[9] << 8 | COM_UART_RxData[8]);
     go_speed = (int16_t)( (uint8_t)COM_UART_RxData[7] << 8 | (uint8_t)COM_UART_RxData[6] );
