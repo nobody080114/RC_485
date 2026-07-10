@@ -57,10 +57,10 @@ JointParam joint_param_0, joint_param_1, joint_param_2, joint_param_3, joint_par
 PosPID_t Pospid[8];
 float G_0 = -55.0F,G_1 = -55.0f,G_2 = -30.0f,G_3 = -30.0f;
 float time = 0.0f,dt = 0.001f;
-uint16_t dt2 = 1;
+uint16_t dt2 = 0,dt3 = 0;
 float theta0_out = 0, theta1_out = 0;
 float go_0_pos=0,go_1_pos=0,go_2_pos=0,go_3_pos=0,go_4_pos=0,go_5_pos=0,go_6_pos=0,go_7_pos=0;
-int8_t start = 0,start_1 = 0,run  = 0,flag_1 = 1,stand_flag = 0,mode = 0,last_mode = 0,control_mode = 0,Enable = 0,go_dir = 0,stand_state = 0;
+int8_t start = 0,start_1 = 0,run  = 0,flag_1 = 1,stand_flag = 0,mode = 0,last_mode = 0,control_mode = 0,Enable = 0,go_dir = 0,stand_state = 0,set_flag = 0,set_flag_1 = 0;
 // go_dir: 1-forward, 2-backward, 3-turn right, 4-turn left,
 //         5-forward right, 6-forward left, 7-backward right, 8-backward left
 //go_dir: 1-前进，2-后退，3-左移，4-右移
@@ -160,7 +160,8 @@ int main(void)
   MX_FDCAN1_Init();
   /* USER CODE BEGIN 2 */
   DWT_Init();
-  HAL_Delay(500);
+  HAL_GPIO_WritePin(GPIOC, GPIO_PIN_14, GPIO_PIN_SET);
+  HAL_Delay(1000);
   P.x = 0.0f;
   P.y = 0.0f;
 
@@ -266,10 +267,10 @@ int main(void)
     /* USER CODE END WHILE */
 
     /* USER CODE BEGIN 3 */
-    
+    DM_Ctrl();
     if(control_mode == 0||control_mode == 2)
     {
-      // DM_Ctrl();
+      
       foot_motion_0.Kp_x = kp_x; foot_motion_0.Kd_xt = kd_xt; foot_motion_0.Kd_xr = kd_xr;
       foot_motion_1.Kp_x = kp_x; foot_motion_1.Kd_xt = kd_xt; foot_motion_1.Kd_xr = kd_xr;
       foot_motion_2.Kp_x = kp_x; foot_motion_2.Kd_xt = kd_xt; foot_motion_2.Kd_xr = kd_xr;
@@ -350,6 +351,13 @@ int main(void)
                   PosPID_Set(&cmd_5,1.0f, 0.01f);
                   PosPID_Set(&cmd_6,1.0f, 0.01f);
                   PosPID_Set(&cmd_7,1.0f, 0.01f);
+                  // if(control_mode == 2)
+                  // {
+                    // foot_motion_0.track.stand_height = -0.200f;
+                    // foot_motion_1.track.stand_height = -0.200f;
+                    // foot_motion_2.track.stand_height = -0.200f;
+                    // foot_motion_3.track.stand_height = -0.200f;
+                  // }
               }
               else if(speed_state == 1)
               {
@@ -365,7 +373,7 @@ int main(void)
             }
             else if(control_mode == 1)
             {
-                // jump_F_set(speed_state);
+                jump_F_set(speed_state);
                 PosPID_Set(&cmd_0,0.0f, 0.0f);  
                 PosPID_Set(&cmd_1,0.0f, 0.0f);
                 PosPID_Set(&cmd_2,0.0f, 0.0f);
@@ -462,7 +470,7 @@ void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim)
         static uint16_t count_1 = 0;
         // if(control_mode == 2)
         // {
-          // DM_upset(dt2);
+        DM_upset(&dt2);
         // }
         count_1++;
         if(count_1>=1000)
@@ -570,7 +578,7 @@ void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim)
                     foot_motion_1.track.step_length  = 0.100f;
                     foot_motion_2.track.step_length  = 0.100f;
                     foot_motion_3.track.step_length  = 0.100f;
-                    traj_param.period = 0.3f;
+                    traj_param.period = 0.4f;
                     speed_state = 2;
                   }
                   else if(speed<400 && speed >=0) 
@@ -597,93 +605,108 @@ void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim)
                     cmd_4.Pos = output_to_rotor(-PI, &joint_param_4); 
                     cmd_5.Pos = output_to_rotor(0, &joint_param_5); 
                     cmd_6.Pos = output_to_rotor(0, &joint_param_6); 
-                    cmd_7.Pos = output_to_rotor(-PI, &joint_param_7); 
+                    cmd_7.Pos = output_to_rotor(-PI, &joint_param_7);  
                     time = 0.0f;
                     if(control_mode == 2) nav_cycle_update_req = 1;
                     // stand_flag = 1;
                   }
                   if(mode == 2)
-                  {
-                      if(cycle_go_dir == 1 || cycle_go_dir == 5 || cycle_go_dir == 6||cycle_go_dir == 3 || cycle_go_dir == 4)
+                  { 
+                      if(set_flag == 0)
                       {
-                        time += dt; 
-                        if(time > traj_param.period) {
-                          time -= traj_param.period;
-                          if(control_mode == 2) {
-                            nav_update_step_length(go_speed, switch_speed, traj_param.period, &inner_ratio);
-                            nav_cycle_dir = go_dir;
-                            nav_cycle_update_req = 0;
-                            cycle_go_dir = nav_cycle_dir;
+                        if(cycle_go_dir == 1 || cycle_go_dir == 5 || cycle_go_dir == 6||cycle_go_dir == 3 || cycle_go_dir == 4)
+                        {
+                          time += dt; 
+                          if(time > traj_param.period) {
+                            time -= traj_param.period;
+                            if(control_mode == 2) {
+                              nav_update_step_length(go_speed, switch_speed, traj_param.period, &inner_ratio);
+                              nav_cycle_dir = go_dir;
+                              nav_cycle_update_req = 0;
+                              cycle_go_dir = nav_cycle_dir;
+                            }
                           }
-                        }
-                        else if(time < 0) time += traj_param.period;
-                      }//前进             
-                      else if(cycle_go_dir == 2 || cycle_go_dir == 7 || cycle_go_dir == 8)
-                      {
-                        time -= dt;
-                        if(time > traj_param.period) time -= traj_param.period;
-                        else if(time < 0) {
-                          time += traj_param.period;
-                          if(control_mode == 2) {
-                            nav_update_step_length(go_speed, switch_speed, traj_param.period, &inner_ratio);
-                            nav_cycle_dir = go_dir;
-                            nav_cycle_update_req = 0;
-                            cycle_go_dir = nav_cycle_dir;
+                          else if(time < 0) time += traj_param.period;
+                        }//前进             
+                        else if(cycle_go_dir == 2 || cycle_go_dir == 7 || cycle_go_dir == 8)
+                        {
+                          time -= dt;
+                          if(time > traj_param.period) time -= traj_param.period;
+                          else if(time < 0) {
+                            time += traj_param.period;
+                            if(control_mode == 2) {
+                              nav_update_step_length(go_speed, switch_speed, traj_param.period, &inner_ratio);
+                              nav_cycle_dir = go_dir;
+                              nav_cycle_update_req = 0;
+                              cycle_go_dir = nav_cycle_dir;
+                            }
                           }
+                        }//后退
+                        if(cycle_go_dir == 1 || cycle_go_dir == 2 || (cycle_go_dir >= 5 && cycle_go_dir <= 8))
+                        {
+                          foot_ellipse_trajectory(time, &foot_motion_0, &traj_param);  //左前
+                          foot_ellipse_trajectory((time+traj_param.period/2.0f), &foot_motion_1, &traj_param); //右前
+                          foot_ellipse_trajectory(time, &foot_motion_2, &traj_param);  //2右后
+                          foot_ellipse_trajectory((time+traj_param.period/2.0f), &foot_motion_3, &traj_param); //3左后
                         }
-                      }//后退
-                      if(cycle_go_dir == 1 || cycle_go_dir == 2 || (cycle_go_dir >= 5 && cycle_go_dir <= 8))
-                      {
-                        foot_ellipse_trajectory(time, &foot_motion_0, &traj_param);  //左前
-                        foot_ellipse_trajectory((time+traj_param.period/2.0f), &foot_motion_1, &traj_param); //右前
-                        foot_ellipse_trajectory(time, &foot_motion_2, &traj_param);  //2右后
-                        foot_ellipse_trajectory((time+traj_param.period/2.0f), &foot_motion_3, &traj_param); //3左后
+                        if(cycle_go_dir == 3)
+                        {
+                          foot_ellipse_trajectory_dir(time, &foot_motion_0, &traj_param, 1.0f);
+                          foot_ellipse_trajectory_dir((time+traj_param.period/2.0f), &foot_motion_1, &traj_param, -1.0f); 
+                          foot_ellipse_trajectory_dir(time, &foot_motion_2, &traj_param, -1.0f);
+                          foot_ellipse_trajectory_dir((time+traj_param.period/2.0f), &foot_motion_3, &traj_param, 1.0f);                                                                       
+                        }
+                        else if(cycle_go_dir == 4)
+                        {
+                          foot_ellipse_trajectory_dir(time, &foot_motion_0, &traj_param, -1.0f);
+                          foot_ellipse_trajectory_dir((time+traj_param.period/2.0f), &foot_motion_1, &traj_param, 1.0f); 
+                          foot_ellipse_trajectory_dir(time, &foot_motion_2, &traj_param, 1.0f);
+                          foot_ellipse_trajectory_dir((time+traj_param.period/2.0f), &foot_motion_3, &traj_param, -1.0f);                                                                       
+                        }
+                        if(fivebar_inverse(foot_motion_0.P.x, foot_motion_0.P.y, &theta0_out, &theta1_out, true))//左前腿 0，1
+                        {
+                          go_0_pos = theta1_out;
+                          go_1_pos = theta0_out;
+                        }
+                        if(fivebar_inverse(foot_motion_1.P.x, foot_motion_1.P.y, &theta0_out, &theta1_out, true))//右前腿 2，3，  
+                        {
+                          go_2_pos = theta1_out; 
+                          go_3_pos = theta0_out;                     
+                        }   
+                        if(fivebar_inverse(foot_motion_2.P.x, foot_motion_2.P.y, &theta0_out, &theta1_out, true))//右后腿 4，5
+                        {
+                          go_4_pos = theta1_out;                
+                          go_5_pos = theta0_out;                                                         
+                        }                 
+                        if(fivebar_inverse(foot_motion_3.P.x, foot_motion_3.P.y, &theta0_out, &theta1_out, true))//左后腿 6，7  
+                        {                       
+                          go_7_pos=  theta1_out;
+                          go_6_pos = theta0_out;                                                               
+                        }
+                        if(Enable)
+                        {
+                          cmd_0.Pos = output_to_rotor(go_0_pos, &joint_param_0); 
+                          cmd_1.Pos = output_to_rotor(go_1_pos, &joint_param_1); 
+                          cmd_2.Pos = output_to_rotor(go_2_pos, &joint_param_2);                 
+                          cmd_3.Pos = output_to_rotor(go_3_pos, &joint_param_3); 
+                          cmd_4.Pos = output_to_rotor(go_4_pos, &joint_param_4);                
+                          cmd_5.Pos = output_to_rotor(go_5_pos, &joint_param_5);  
+                          cmd_6.Pos = output_to_rotor(go_6_pos, &joint_param_6);                  
+                          cmd_7.Pos = output_to_rotor(go_7_pos, &joint_param_7);
+                        }   
                       }
-                      if(cycle_go_dir == 3)
+                      else 
                       {
-                        foot_ellipse_trajectory_dir(time, &foot_motion_0, &traj_param, 1.0f);
-                        foot_ellipse_trajectory_dir((time+traj_param.period/2.0f), &foot_motion_1, &traj_param, -1.0f); 
-                        foot_ellipse_trajectory_dir(time, &foot_motion_2, &traj_param, -1.0f);
-                        foot_ellipse_trajectory_dir((time+traj_param.period/2.0f), &foot_motion_3, &traj_param, 1.0f);                                                                       
+                        cmd_0.Pos = output_to_rotor(-PI, &joint_param_0); 
+                        cmd_1.Pos = output_to_rotor(0, &joint_param_1); 
+                        cmd_2.Pos = output_to_rotor(-PI, &joint_param_2); 
+                        cmd_3.Pos = output_to_rotor(0, &joint_param_3); 
+                        cmd_4.Pos = output_to_rotor(-PI, &joint_param_4); 
+                        cmd_5.Pos = output_to_rotor(0, &joint_param_5); 
+                        cmd_6.Pos = output_to_rotor(0, &joint_param_6); 
+                        cmd_7.Pos = output_to_rotor(-PI, &joint_param_7);  
                       }
-                      else if(cycle_go_dir == 4)
-                      {
-                        foot_ellipse_trajectory_dir(time, &foot_motion_0, &traj_param, -1.0f);
-                        foot_ellipse_trajectory_dir((time+traj_param.period/2.0f), &foot_motion_1, &traj_param, 1.0f); 
-                        foot_ellipse_trajectory_dir(time, &foot_motion_2, &traj_param, 1.0f);
-                        foot_ellipse_trajectory_dir((time+traj_param.period/2.0f), &foot_motion_3, &traj_param, -1.0f);                                                                       
-                      }  
-                      if(fivebar_inverse(foot_motion_0.P.x, foot_motion_0.P.y, &theta0_out, &theta1_out, true))//左前腿 0，1
-                      {
-                        go_0_pos = theta1_out;
-                        go_1_pos = theta0_out;
-                      }
-                      if(fivebar_inverse(foot_motion_1.P.x, foot_motion_1.P.y, &theta0_out, &theta1_out, true))//右前腿 2，3，  
-                      {
-                        go_2_pos = theta1_out; 
-                        go_3_pos = theta0_out;                     
-                      }   
-                      if(fivebar_inverse(foot_motion_2.P.x, foot_motion_2.P.y, &theta0_out, &theta1_out, true))//右后腿 4，5
-                      {
-                        go_4_pos = theta1_out;                
-                        go_5_pos = theta0_out;                                                         
-                      }                 
-                      if(fivebar_inverse(foot_motion_3.P.x, foot_motion_3.P.y, &theta0_out, &theta1_out, true))//左后腿 6，7  
-                      {                       
-                        go_7_pos=  theta1_out;
-                        go_6_pos = theta0_out;                                                               
-                      }
-                      if(Enable)
-                      {
-                        cmd_0.Pos = output_to_rotor(go_0_pos, &joint_param_0); 
-                        cmd_1.Pos = output_to_rotor(go_1_pos, &joint_param_1); 
-                        cmd_2.Pos = output_to_rotor(go_2_pos, &joint_param_2);                 
-                        cmd_3.Pos = output_to_rotor(go_3_pos, &joint_param_3); 
-                        cmd_4.Pos = output_to_rotor(go_4_pos, &joint_param_4);                
-                        cmd_5.Pos = output_to_rotor(go_5_pos, &joint_param_5);  
-                        cmd_6.Pos = output_to_rotor(go_6_pos, &joint_param_6);                  
-                        cmd_7.Pos = output_to_rotor(go_7_pos, &joint_param_7);
-                      }     
+    
                                
                   }
                 }

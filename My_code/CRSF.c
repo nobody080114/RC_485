@@ -4,12 +4,17 @@
 __attribute__((section(".RAM_D2")))
 static uint8_t TempRxBuff[26];
 uint16_t CRSF[16];
+int16_t need_angle;
 extern DMA_HandleTypeDef hdma_uart5_rx;
 static uint8_t UARTRxBuff[26];
 extern uint16_t Key[10];
 extern int8_t start_1,run,flag_1,mode,control_mode,Enable,go_dir;
 extern int8_t jump_start_req,jump_armed;
 extern uint16_t speed;
+extern float angle;
+extern uint8_t turn;
+uint8_t DM_VCC_Flag,Last_DM_VCC_Flag,DM_Enable_Flag,DM_Enable;
+uint8_t control_motor = 0;
 /**
   * 函    数：CRSF初始化
   * 参    数：无
@@ -139,41 +144,54 @@ void CRSF_Key_Get(uint16_t *key)
 void CRSF_Schedule(void)
 {
     CRSF_Key_Get(Key);
-    if(control_mode == 0 || control_mode == 1)
+    if(Key[9] < 800) //狗身控制
     {
-      if(mode == 2)
+      if(control_mode == 0 || control_mode == 1)
       {
-        if(Key[1] >= 1200 && Key[0]>=800 && Key[0]<=1200) go_dir = 1; //前进拨键
-        else if(Key[1] <= 800 && Key[0]>=800 && Key[0]<=1200) go_dir = 2; //后退拨键
-        else if(Key[0] >= 1200 && Key[1]>=800 && Key[1]<=1200) go_dir = 3;//原地右转拨键
-        else if(Key[0] <= 800 && Key[1]>=800 && Key[1]<=1200) go_dir = 4;//原地左转拨键
-        else if (Key[0] >= 1200 && Key[1]>=1200) go_dir = 5;//右前斜移拨键
-        else if (Key[0] <= 800 && Key[1]>=1200) go_dir = 6;//左前斜移拨键
-        else if (Key[0] >= 1200 && Key[1]<=800) go_dir = 7;//右后斜移拨键
-        else if (Key[0] <= 800 && Key[1]<=800) go_dir = 8;//左后斜移拨键
-        else go_dir = 0;//停
-      }
-      else if(mode == 3)
-      {
-        go_dir = 0;
-        if(Key[1] >= 1200 && jump_armed && run == 1)
+        DM_VCC_Flag = 0;
+        if(mode == 2)
         {
-          jump_start_req = 1;
-          jump_armed = 0;
+          if(Key[1] >= 1200 && Key[0]>=800 && Key[0]<=1200) go_dir = 1; //前进拨键
+          else if(Key[1] <= 800 && Key[0]>=800 && Key[0]<=1200) go_dir = 2; //后退拨键
+          else if(Key[0] >= 1200 && Key[1]>=800 && Key[1]<=1200) go_dir = 3;//原地右转拨键
+          else if(Key[0] <= 800 && Key[1]>=800 && Key[1]<=1200) go_dir = 4;//原地左转拨键
+          else if (Key[0] >= 1200 && Key[1]>=1200) go_dir = 5;//右前斜移拨键
+          else if (Key[0] <= 800 && Key[1]>=1200) go_dir = 6;//左前斜移拨键
+          else if (Key[0] >= 1200 && Key[1]<=800) go_dir = 7;//右后斜移拨键
+          else if (Key[0] <= 800 && Key[1]<=800) go_dir = 8;//左后斜移拨键
+          else go_dir = 0;//停
         }
-        else if(Key[1] < 1100)
+        else if(mode == 3)
         {
-          jump_armed = 1;
+          go_dir = 0;
+          if(Key[1] >= 1200 && jump_armed && run == 1)
+          {
+            jump_start_req = 1;
+            jump_armed = 0;
+          }
+          else if(Key[1] < 1100)
+          {
+            jump_armed = 1;
+          }
         }
       }
+      if(run == 1) speed = Key[2]-174; else speed = 0;//左拨杆
+      
+      if(Key[7] == 1792) run = 1; else run = 0;///右按键
+      if(Key[8] == 1792) start_1 = 1; else start_1 = 0;//左上长按键
+      if(Key[4] == 1792) Enable = 1; else Enable = 0;//左按键
+      
+      if(Key[5] == 191) mode = 2; else if(Key[5] == 997) mode = 1; else if(Key[5] == 1792) mode = 3;//左拨键 //1-站立，2-行走，3-跳跃
+      // if(Key[9]<800) stand_state = 0; else if(Key[9]<1300 && Key[9]>=800) stand_state = 1; else stand_state = 2;//右上长按键
+      if(Key[6] == 191) control_mode = 0; else if(Key[6] == 997) control_mode = 1; else if(Key[6] == 1792) control_mode = 2;//右拨键 //0-位控，1-力控，2-自动控制
     }
-    if(run == 1) speed = Key[2]-174; else speed = 0;//左拨杆
-    
-    if(Key[7] == 1792) run = 1; else run = 0;///右按键
-    if(Key[8] == 1792) start_1 = 1; else start_1 = 0;//左上长按键
-    if(Key[4] == 1792) Enable = 1; else Enable = 0;//左按键
-    
-    if(Key[5] == 191) mode = 2; else if(Key[5] == 997) mode = 1; else if(Key[5] == 1792) mode = 3;//左拨键 //1-站立，2-行走，3-跳跃
-    // if(Key[9]<800) stand_state = 0; else if(Key[9]<1300 && Key[9]>=800) stand_state = 1; else stand_state = 2;//右上长按键
-    if(Key[6] == 191) control_mode = 0; else if(Key[6] == 997) control_mode = 1; else if(Key[6] == 1792) control_mode = 2;//右拨键 //0-位控，1-力控，2-自动控制
+    else if(Key[9] > 800) //机械臂控制
+    {
+      DM_VCC_Flag = 1;
+      if(DM_VCC_Flag == 1 && Last_DM_VCC_Flag == 0) DM_Enable_Flag = 1;
+      if(Key[5] == 191) control_motor = 1; else if(Key[5] == 997) control_motor = 2; else if(Key[5] == 1792) control_motor = 3;//左拨键 //1-机械臂电机1，2-机械臂电机2，3-机械臂电机3
+      need_angle = Key[1]-992;
+      if(Key[4] == 1792) DM_Enable = 1; else DM_Enable = 0;//左按键
+    }
+    Last_DM_VCC_Flag = DM_VCC_Flag;
 }
