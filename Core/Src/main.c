@@ -20,6 +20,7 @@
 #include "main.h"
 #include "dma.h"
 #include "fdcan.h"
+#include "motion.h"
 #include "tim.h"
 #include "usart.h"
 #include "gpio.h"
@@ -65,7 +66,7 @@ int8_t start = 0,start_1 = 0,run  = 0,flag_1 = 1,stand_flag = 0,mode = 0,last_mo
 //         5-forward right, 6-forward left, 7-backward right, 8-backward left
 //go_dir: 1-前进，2-后退，3-左移，4-右移
 static int8_t nav_cycle_dir = 0;
-static uint8_t nav_cycle_update_req = 1;
+uint8_t nav_cycle_update_req = 1,half_flag = 0;;
 uint16_t speed = 0,speed_state = 0,last_speed_state = 0;//speed_state: 0-停止，1-低速，2-中速，3-高速
 uint32_t zhen = 0,cnt = 0,cnt_tx = 0;
 uint16_t Key[10];
@@ -328,8 +329,11 @@ int main(void)
         {
             if(control_mode == 0 || control_mode == 2)
             {
-              cmd_0.T = 0;cmd_1.T = 0;cmd_2.T = 0;cmd_3.T = 0;
-              cmd_4.T = 0;cmd_5.T = 0;cmd_6.T = 0;cmd_7.T = 0;  
+              if(control_mode == 0)
+              {
+                cmd_0.T = 0;cmd_1.T = 0;cmd_2.T = 0;cmd_3.T = 0;
+                cmd_4.T = 0;cmd_5.T = 0;cmd_6.T = 0;cmd_7.T = 0;  
+              }
               if(speed_state == 3)
               {
                   PosPID_Set(&cmd_0,1.0f, 0.01f);  
@@ -370,10 +374,17 @@ int main(void)
                   PosPID_Set(&cmd_6,0.6f, 0.01f);
                   PosPID_Set(&cmd_7,0.6f, 0.01f);
               }
+              if(half_flag == 2)
+              {
+                  PosPID_Set(&cmd_4,0.0f, 0.0f);
+                  PosPID_Set(&cmd_5,0.0f, 0.0f);
+                  PosPID_Set(&cmd_6,0.0f, 0.0f);
+                  PosPID_Set(&cmd_7,0.0f, 0.0f);                
+              }
             }
             else if(control_mode == 1)
             {
-                jump_F_set();
+                // jump_F_set();
                 PosPID_Set(&cmd_0,0.0f, 0.0f);  
                 PosPID_Set(&cmd_1,0.0f, 0.0f);
                 PosPID_Set(&cmd_2,0.0f, 0.0f);
@@ -533,8 +544,19 @@ void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim)
                 joint_param_5.output_zero = -0.54070;// 根据实际安装调整零位
                 joint_param_6.output_zero = -0.54070;// 根据实际安装调整零位
                 joint_param_7.output_zero = -2.622;// 根据实际安装调整零位
-                time = 0.0f;     
+                time = 0.0f;
+                count = 0;     
                 flag_1 = 2;
+            }
+        }
+        if((start_1 == 1)&&(flag_1==2))
+        {
+            if(count<1000)count++;
+            if(count>=1000)
+            {
+                half_flag++;
+                half_flag %= 3;
+                count = 0;
             }
         }
         if(flag_1 == 2)
@@ -595,7 +617,7 @@ void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim)
                 if(last_speed_state!= speed_state) {time = 0.0f;}
                 // if(last_mode == 1 && mode == 2) {stand_flag = 2;}
                 if(control_mode == 0 || control_mode == 2)
-                {                                  
+                {                               
                   if(mode == 1)
                   {
                     cmd_0.Pos = output_to_rotor(-PI, &joint_param_0); 
@@ -672,17 +694,33 @@ void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim)
                         {
                           go_2_pos = theta1_out; 
                           go_3_pos = theta0_out;                     
-                        }   
-                        if(fivebar_inverse(foot_motion_2.P.x, foot_motion_2.P.y, &theta0_out, &theta1_out, true))//右后腿 4，5
-                        {
-                          go_4_pos = theta1_out;                
-                          go_5_pos = theta0_out;                                                         
-                        }                 
-                        if(fivebar_inverse(foot_motion_3.P.x, foot_motion_3.P.y, &theta0_out, &theta1_out, true))//左后腿 6，7  
-                        {                       
-                          go_7_pos=  theta1_out;
-                          go_6_pos = theta0_out;                                                               
                         }
+                        if(half_flag == 0)
+                        {
+                          if(fivebar_inverse(foot_motion_2.P.x, foot_motion_2.P.y, &theta0_out, &theta1_out, true))//右后腿 4，5
+                          {
+                            go_4_pos = theta1_out;                
+                            go_5_pos = theta0_out;                                                         
+                          }                 
+                          if(fivebar_inverse(foot_motion_3.P.x, foot_motion_3.P.y, &theta0_out, &theta1_out, true))//左后腿 6，7  
+                          {                       
+                            go_7_pos=  theta1_out;
+                            go_6_pos = theta0_out;                                                               
+                          }
+                        }   
+                        else if(half_flag == 1)
+                        {
+                          if(fivebar_inverse(-0.1135f, -0.06584f, &theta0_out, &theta1_out, true))//右后腿 4，5
+                          {
+                            go_5_pos = theta1_out;                
+                            go_4_pos = theta0_out;                                                         
+                          }                 
+                          if(fivebar_inverse(-0.1135f, -0.06584f, &theta0_out, &theta1_out, true))//左后腿 6，7  
+                          {                       
+                            go_6_pos=  theta1_out;
+                            go_7_pos = theta0_out;                                                               
+                          }
+                        }   
                         if(Enable)
                         {
                           cmd_0.Pos = output_to_rotor(go_0_pos, &joint_param_0); 
@@ -789,22 +827,59 @@ void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim)
                     {
                       foot_ellipse_trajectory(time, &foot_motion_0, &traj_param);
                       foot_ellipse_trajectory(time+traj_param.period/2.0f, &foot_motion_1, &traj_param);
-                      foot_ellipse_trajectory(time, &foot_motion_2, &traj_param);
-                      foot_ellipse_trajectory(time+traj_param.period/2.0f, &foot_motion_3, &traj_param);
+                      if(half_flag == 0)
+                      {
+                        foot_ellipse_trajectory(time, &foot_motion_2, &traj_param);
+                        foot_ellipse_trajectory(time+traj_param.period/2.0f, &foot_motion_3, &traj_param);
+                      }
+                      else
+                      {
+                        foot_motion_2.P.x = -0.1135f;
+                        foot_motion_2.P.y = -0.06584f;
+                        foot_motion_3.P.x = -0.1135f;
+                        foot_motion_3.P.y = -0.06584f;
+                      }
                     }
                     else if(go_dir == 3)
                     {
                       foot_ellipse_trajectory_dir(time, &foot_motion_0, &traj_param, 1.0f);
                       foot_ellipse_trajectory_dir(time+traj_param.period/2.0f, &foot_motion_1, &traj_param, -1.0f);
-                      foot_ellipse_trajectory_dir(time, &foot_motion_2, &traj_param, -1.0f);
-                      foot_ellipse_trajectory_dir(time+traj_param.period/2.0f, &foot_motion_3, &traj_param, 1.0f);
+                      if(half_flag == 0)
+                      {
+                        foot_ellipse_trajectory_dir(time, &foot_motion_2, &traj_param, -1.0f);
+                        foot_ellipse_trajectory_dir(time+traj_param.period/2.0f, &foot_motion_3, &traj_param, 1.0f);
+                      }
+                      else
+                      {
+                        foot_motion_2.P.x = -0.1135f;
+                        foot_motion_2.P.y = -0.06584f;
+                        foot_motion_3.P.x = -0.1135f;
+                        foot_motion_3.P.y = -0.06584f;
+                      }
                     }
                     else if(go_dir == 4)
                     {
                       foot_ellipse_trajectory_dir(time, &foot_motion_0, &traj_param, -1.0f);
                       foot_ellipse_trajectory_dir(time+traj_param.period/2.0f, &foot_motion_1, &traj_param, 1.0f);
-                      foot_ellipse_trajectory_dir(time, &foot_motion_2, &traj_param, 1.0f);
-                      foot_ellipse_trajectory_dir(time+traj_param.period/2.0f, &foot_motion_3, &traj_param, -1.0f);
+                      if(half_flag == 0)
+                      {
+                        foot_ellipse_trajectory_dir(time, &foot_motion_2, &traj_param, 1.0f);
+                        foot_ellipse_trajectory_dir(time+traj_param.period/2.0f, &foot_motion_3, &traj_param, -1.0f);
+                      }
+                      else
+                      {
+                        foot_motion_2.P.x = -0.1135f;
+                        foot_motion_2.P.y = -0.06584f;
+                        foot_motion_3.P.x = -0.1135f;
+                        foot_motion_3.P.y = -0.06584f;
+                      }
+                    }
+                    if(half_flag == 1)
+                    {
+                      foot_motion_2.P.x = -0.1135f;
+                      foot_motion_2.P.y = -0.06584f;
+                      foot_motion_3.P.x = -0.1135f;
+                      foot_motion_3.P.y = -0.06584f;
                     }
                     // 计算期望足端速度 (对目标轨迹求导)
                     foot_motion_0.target_vx =  (foot_motion_0.P.x - foot_motion_0.last_P.x) / dt;
@@ -830,6 +905,10 @@ void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim)
                     foot_motion_1.G_1 = 0.0f;
                     foot_motion_2.G_1 = 0.0f;
                     foot_motion_3.G_1 = 0.0f;
+                    foot_motion_0.G_2 = -20.0f;
+                    foot_motion_1.G_2 = -20.0f;
+                    foot_motion_2.G_2 = -20.0f;
+                    foot_motion_3.G_2 = -20.0f;
                     jump_update(dt);           
                   }
                   if(fwd_kinematics_and_jacobian(foot_motion_0.output_now_1, foot_motion_0.output_now_0, true, &foot_motion_0.current_P, &foot_motion_0.J)) 
@@ -845,10 +924,15 @@ void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim)
                     }
                     else if(mode == 3)
                     {
-                      if(jump_state == JUMP_CROUCH||jump_state == JUMP_THRUST||jump_state == JUMP_RECOVER||jump_state == JUMP_LAND||jump_state == JUMP_IDLE) 
+                      if(jump_state == JUMP_CROUCH)
                       {
                         foot_motion_0.Fx = jump_ff_x + foot_motion_0.Kp_x_j * (foot_motion_0.P.x - foot_motion_0.current_P.x)+ foot_motion_0.Kd_xt * foot_motion_0.target_vx - foot_motion_0.Kd_xr*foot_motion_0.filtered_vx;
                         foot_motion_0.Fy = jump_ff_y + foot_motion_0.Kp_y_j * (foot_motion_0.P.y - foot_motion_0.current_P.y)+ foot_motion_0.Kd_yt * foot_motion_0.target_vy - foot_motion_0.Kd_yr*foot_motion_0.filtered_vy;
+                      }
+                      else if(jump_state == JUMP_THRUST||jump_state == JUMP_RECOVER||jump_state == JUMP_LAND||jump_state == JUMP_IDLE) 
+                      {
+                        foot_motion_0.Fx = jump_ff_x + foot_motion_0.Kp_x_j * (foot_motion_0.P.x - foot_motion_0.current_P.x)+ foot_motion_0.Kd_xt * foot_motion_0.target_vx - foot_motion_0.Kd_xr*foot_motion_0.filtered_vx;
+                        foot_motion_0.Fy = jump_ff_y + foot_motion_0.G_2 + foot_motion_0.Kp_y_j * (foot_motion_0.P.y - foot_motion_0.current_P.y)+ foot_motion_0.Kd_yt * foot_motion_0.target_vy - foot_motion_0.Kd_yr*foot_motion_0.filtered_vy;
                       }
                       else if(jump_state == JUMP_FLIGHT)
                       {
@@ -878,10 +962,15 @@ void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim)
                     }
                     else if(mode == 3)
                     {
-                      if(jump_state == JUMP_CROUCH||jump_state == JUMP_THRUST||jump_state == JUMP_RECOVER||jump_state == JUMP_LAND||jump_state == JUMP_IDLE)
+                      if(jump_state == JUMP_CROUCH)
                       {
                         foot_motion_1.Fx = jump_ff_x + foot_motion_1.Kp_x_j * (foot_motion_1.P.x - foot_motion_1.current_P.x)+ foot_motion_1.Kd_xt * foot_motion_1.target_vx - foot_motion_1.Kd_xr*foot_motion_1.filtered_vx;
                         foot_motion_1.Fy = jump_ff_y + foot_motion_1.Kp_y_j * (foot_motion_1.P.y - foot_motion_1.current_P.y)+ foot_motion_1.Kd_yt * foot_motion_1.target_vy - foot_motion_1.Kd_yr*foot_motion_1.filtered_vy;
+                      }
+                      else if(jump_state == JUMP_THRUST||jump_state == JUMP_RECOVER||jump_state == JUMP_LAND||jump_state == JUMP_IDLE)
+                      {
+                        foot_motion_1.Fx = jump_ff_x + foot_motion_1.Kp_x_j * (foot_motion_1.P.x - foot_motion_1.current_P.x)+ foot_motion_1.Kd_xt * foot_motion_1.target_vx - foot_motion_1.Kd_xr*foot_motion_1.filtered_vx;
+                        foot_motion_1.Fy = jump_ff_y + foot_motion_1.G_2 + foot_motion_1.Kp_y_j * (foot_motion_1.P.y - foot_motion_1.current_P.y)+ foot_motion_1.Kd_yt * foot_motion_1.target_vy - foot_motion_1.Kd_yr*foot_motion_1.filtered_vy;
                       }
                       else if(jump_state == JUMP_FLIGHT)
                       {
@@ -906,20 +995,46 @@ void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim)
                     foot_motion_2.filtered_vy = VEL_ALPHA * foot_motion_2.raw_vy + (1.0f - VEL_ALPHA) * foot_motion_2.filtered_vy;
                     if(mode == 1|| mode == 2)
                     {
-                      foot_motion_2.Fx =foot_motion_2.Kp_x * (foot_motion_2.P.x - foot_motion_2.current_P.x)+ foot_motion_2.Kd_xt * foot_motion_2.target_vx - foot_motion_2.Kd_xr*foot_motion_2.filtered_vx;
-                      foot_motion_2.Fy =foot_motion_2.G_1 + foot_motion_2.G_0 + foot_motion_2.Kp_y * (foot_motion_2.P.y - foot_motion_2.current_P.y)+ foot_motion_2.Kd_yt * foot_motion_2.target_vy - foot_motion_2.Kd_yr*foot_motion_2.filtered_vy;
+                      if(half_flag == 0)
+                      {
+                        foot_motion_2.Fx =foot_motion_2.Kp_x * (foot_motion_2.P.x - foot_motion_2.current_P.x)+ foot_motion_2.Kd_xt * foot_motion_2.target_vx - foot_motion_2.Kd_xr*foot_motion_2.filtered_vx;
+                        foot_motion_2.Fy =foot_motion_2.G_1 + foot_motion_2.G_0 + foot_motion_2.Kp_y * (foot_motion_2.P.y - foot_motion_2.current_P.y)+ foot_motion_2.Kd_yt * foot_motion_2.target_vy - foot_motion_2.Kd_yr*foot_motion_2.filtered_vy;
+                      }
+                      else if(half_flag == 1)
+                      {
+                        foot_motion_2.Fx =foot_motion_2.Kp_x * (foot_motion_2.P.x - foot_motion_2.current_P.x)+ foot_motion_2.Kd_xt * foot_motion_2.target_vx - foot_motion_2.Kd_xr*foot_motion_2.filtered_vx;
+                        foot_motion_2.Fy =foot_motion_2.Kp_y * (foot_motion_2.P.y - foot_motion_2.current_P.y)+ foot_motion_2.Kd_yt * foot_motion_2.target_vy - foot_motion_2.Kd_yr*foot_motion_2.filtered_vy;
+                      }
+                      else if(half_flag == 2)
+                      {
+                        foot_motion_2.Fx =0.0f;
+                        foot_motion_2.Fy =0.0f;
+                      }
                     }
                     else if(mode == 3)
                     {
-                      if(jump_state == JUMP_CROUCH||jump_state == JUMP_THRUST||jump_state == JUMP_RECOVER||jump_state == JUMP_LAND||jump_state == JUMP_IDLE)
+                      if(half_flag == 0)
                       {
-                        foot_motion_2.Fx = jump_ff_x + foot_motion_2.Kp_x_j * (foot_motion_2.P.x - foot_motion_2.current_P.x)+ foot_motion_2.Kd_xt * foot_motion_2.target_vx - foot_motion_2.Kd_xr*foot_motion_2.filtered_vx;
-                        foot_motion_2.Fy = jump_ff_y + foot_motion_2.Kp_y_j * (foot_motion_2.P.y - foot_motion_2.current_P.y)+ foot_motion_2.Kd_yt * foot_motion_2.target_vy - foot_motion_2.Kd_yr*foot_motion_2.filtered_vy;
+                        if(jump_state == JUMP_CROUCH)
+                        {
+                          foot_motion_2.Fx = jump_ff_x + foot_motion_2.Kp_x_j * (foot_motion_2.P.x - foot_motion_2.current_P.x)+ foot_motion_2.Kd_xt * foot_motion_2.target_vx - foot_motion_2.Kd_xr*foot_motion_2.filtered_vx;
+                          foot_motion_2.Fy = jump_ff_y + foot_motion_2.Kp_y_j * (foot_motion_2.P.y - foot_motion_2.current_P.y)+ foot_motion_2.Kd_yt * foot_motion_2.target_vy - foot_motion_2.Kd_yr*foot_motion_2.filtered_vy;
+                        }
+                        else if(jump_state == JUMP_THRUST||jump_state == JUMP_RECOVER||jump_state == JUMP_LAND||jump_state == JUMP_IDLE)
+                        {
+                          foot_motion_2.Fx = jump_ff_x + foot_motion_2.Kp_x_j * (foot_motion_2.P.x - foot_motion_2.current_P.x)+ foot_motion_2.Kd_xt * foot_motion_2.target_vx - foot_motion_2.Kd_xr*foot_motion_2.filtered_vx;
+                          foot_motion_2.Fy = jump_ff_y + foot_motion_2.G_2 + foot_motion_2.Kp_y_j * (foot_motion_2.P.y - foot_motion_2.current_P.y)+ foot_motion_2.Kd_yt * foot_motion_2.target_vy - foot_motion_2.Kd_yr*foot_motion_2.filtered_vy;
+                        }
+                        else if(jump_state == JUMP_FLIGHT)
+                        {
+                          foot_motion_2.Fx = jump_ff_x + foot_motion_2.Kp_x_f * (foot_motion_2.P.x - foot_motion_2.current_P.x)+ foot_motion_2.Kd_xt * foot_motion_2.target_vx - foot_motion_2.Kd_xr*foot_motion_2.filtered_vx;
+                          foot_motion_2.Fy = jump_ff_y + foot_motion_2.Kp_y_f * (foot_motion_2.P.y - foot_motion_2.current_P.y)+ foot_motion_2.Kd_yt * foot_motion_2.target_vy - foot_motion_2.Kd_yr*foot_motion_2.filtered_vy;
+                        }
                       }
-                      else if(jump_state == JUMP_FLIGHT)
+                      else
                       {
-                        foot_motion_2.Fx = jump_ff_x + foot_motion_2.Kp_x_f * (foot_motion_2.P.x - foot_motion_2.current_P.x)+ foot_motion_2.Kd_xt * foot_motion_2.target_vx - foot_motion_2.Kd_xr*foot_motion_2.filtered_vx;
-                        foot_motion_2.Fy = jump_ff_y + foot_motion_2.Kp_y_f * (foot_motion_2.P.y - foot_motion_2.current_P.y)+ foot_motion_2.Kd_yt * foot_motion_2.target_vy - foot_motion_2.Kd_yr*foot_motion_2.filtered_vy;
+                        foot_motion_2.Fx =foot_motion_2.Kp_x * (foot_motion_2.P.x - foot_motion_2.current_P.x)+ foot_motion_2.Kd_xt * foot_motion_2.target_vx - foot_motion_2.Kd_xr*foot_motion_2.filtered_vx;
+                        foot_motion_2.Fy =foot_motion_2.Kp_y * (foot_motion_2.P.y - foot_motion_2.current_P.y)+ foot_motion_2.Kd_yt * foot_motion_2.target_vy - foot_motion_2.Kd_yr*foot_motion_2.filtered_vy;                       
                       }
                     }
                     foot_motion_2.target_tau1 = (foot_motion_2.J.J00 * foot_motion_2.Fx + foot_motion_2.J.J10 * foot_motion_2.Fy)* joint_param_5.dir / joint_param_5.ratio;
@@ -939,20 +1054,46 @@ void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim)
                     foot_motion_3.filtered_vy = VEL_ALPHA * foot_motion_3.raw_vy + (1.0f - VEL_ALPHA) * foot_motion_3.filtered_vy;
                     if(mode == 1|| mode == 2)
                     {
-                      foot_motion_3.Fx =foot_motion_3.Kp_x * (foot_motion_3.P.x - foot_motion_3.current_P.x)+ foot_motion_3.Kd_xt * foot_motion_3.target_vx - foot_motion_3.Kd_xr*foot_motion_3.filtered_vx;
-                      foot_motion_3.Fy =foot_motion_3.G_1 + foot_motion_3.G_0 + foot_motion_3.Kp_y * (foot_motion_3.P.y - foot_motion_3.current_P.y)+ foot_motion_3.Kd_yt * foot_motion_3.target_vy - foot_motion_3.Kd_yr*foot_motion_3.filtered_vy;
+                      if(half_flag == 0)
+                      {
+                        foot_motion_3.Fx =foot_motion_3.Kp_x * (foot_motion_3.P.x - foot_motion_3.current_P.x)+ foot_motion_3.Kd_xt * foot_motion_3.target_vx - foot_motion_3.Kd_xr*foot_motion_3.filtered_vx;
+                        foot_motion_3.Fy =foot_motion_3.G_1 + foot_motion_3.G_0 + foot_motion_3.Kp_y * (foot_motion_3.P.y - foot_motion_3.current_P.y)+ foot_motion_3.Kd_yt * foot_motion_3.target_vy - foot_motion_3.Kd_yr*foot_motion_3.filtered_vy;
+                      }
+                      else if(half_flag == 1)
+                      {
+                        foot_motion_3.Fx =foot_motion_3.Kp_x * (foot_motion_3.P.x - foot_motion_3.current_P.x)+ foot_motion_3.Kd_xt * foot_motion_3.target_vx - foot_motion_3.Kd_xr*foot_motion_3.filtered_vx;
+                        foot_motion_3.Fy =foot_motion_3.Kp_y * (foot_motion_3.P.y - foot_motion_3.current_P.y)+ foot_motion_3.Kd_yt * foot_motion_3.target_vy - foot_motion_3.Kd_yr*foot_motion_3.filtered_vy;
+                      }
+                      else if(half_flag == 2)
+                      {
+                        foot_motion_3.Fx =0.0f;
+                        foot_motion_3.Fy =0.0f;
+                      }
                     }
                     else if(mode == 3)
                     {
-                      if(jump_state == JUMP_CROUCH||jump_state == JUMP_THRUST||jump_state == JUMP_RECOVER||jump_state == JUMP_LAND||jump_state == JUMP_IDLE) 
+                      if(half_flag == 0)
                       {
-                        foot_motion_3.Fx = jump_ff_x + foot_motion_3.Kp_x_j * (foot_motion_3.P.x - foot_motion_3.current_P.x)+ foot_motion_3.Kd_xt * foot_motion_3.target_vx - foot_motion_3.Kd_xr*foot_motion_3.filtered_vx;
-                        foot_motion_3.Fy = jump_ff_y + foot_motion_3.Kp_y_j * (foot_motion_3.P.y - foot_motion_3.current_P.y)+ foot_motion_3.Kd_yt * foot_motion_3.target_vy - foot_motion_3.Kd_yr*foot_motion_3.filtered_vy;
+                        if(jump_state == JUMP_CROUCH)
+                        {
+                          foot_motion_3.Fx = jump_ff_x + foot_motion_3.Kp_x_j * (foot_motion_3.P.x - foot_motion_3.current_P.x)+ foot_motion_3.Kd_xt * foot_motion_3.target_vx - foot_motion_3.Kd_xr*foot_motion_3.filtered_vx;
+                          foot_motion_3.Fy = jump_ff_y + foot_motion_3.Kp_y_j * (foot_motion_3.P.y - foot_motion_3.current_P.y)+ foot_motion_3.Kd_yt * foot_motion_3.target_vy - foot_motion_3.Kd_yr*foot_motion_3.filtered_vy;
+                        }
+                        else if(jump_state == JUMP_THRUST||jump_state == JUMP_RECOVER||jump_state == JUMP_LAND||jump_state == JUMP_IDLE) 
+                        {
+                          foot_motion_3.Fx = jump_ff_x + foot_motion_3.Kp_x_j * (foot_motion_3.P.x - foot_motion_3.current_P.x)+ foot_motion_3.Kd_xt * foot_motion_3.target_vx - foot_motion_3.Kd_xr*foot_motion_3.filtered_vx;
+                          foot_motion_3.Fy = jump_ff_y + foot_motion_3.G_2+ foot_motion_3.Kp_y_j * (foot_motion_3.P.y - foot_motion_3.current_P.y)+ foot_motion_3.Kd_yt * foot_motion_3.target_vy - foot_motion_3.Kd_yr*foot_motion_3.filtered_vy;
+                        }
+                        else if(jump_state == JUMP_FLIGHT)
+                        {
+                          foot_motion_3.Fx = jump_ff_x + foot_motion_3.Kp_x_f * (foot_motion_3.P.x - foot_motion_3.current_P.x)+ foot_motion_3.Kd_xt * foot_motion_3.target_vx - foot_motion_3.Kd_xr*foot_motion_3.filtered_vx;
+                          foot_motion_3.Fy = jump_ff_y + foot_motion_3.Kp_y_f * (foot_motion_3.P.y - foot_motion_3.current_P.y)+ foot_motion_3.Kd_yt * foot_motion_3.target_vy - foot_motion_3.Kd_yr*foot_motion_3.filtered_vy;
+                        }
                       }
-                      else if(jump_state == JUMP_FLIGHT)
+                      else
                       {
-                        foot_motion_3.Fx = jump_ff_x + foot_motion_3.Kp_x_f * (foot_motion_3.P.x - foot_motion_3.current_P.x)+ foot_motion_3.Kd_xt * foot_motion_3.target_vx - foot_motion_3.Kd_xr*foot_motion_3.filtered_vx;
-                        foot_motion_3.Fy = jump_ff_y + foot_motion_3.Kp_y_f * (foot_motion_3.P.y - foot_motion_3.current_P.y)+ foot_motion_3.Kd_yt * foot_motion_3.target_vy - foot_motion_3.Kd_yr*foot_motion_3.filtered_vy;
+                        foot_motion_3.Fx =foot_motion_3.Kp_x * (foot_motion_3.P.x - foot_motion_3.current_P.x)+ foot_motion_3.Kd_xt * foot_motion_3.target_vx - foot_motion_3.Kd_xr*foot_motion_3.filtered_vx;
+                        foot_motion_3.Fy =foot_motion_3.Kp_y * (foot_motion_3.P.y - foot_motion_3.current_P.y)+ foot_motion_3.Kd_yt * foot_motion_3.target_vy - foot_motion_3.Kd_yr*foot_motion_3.filtered_vy;                       
                       }
                     }
                     foot_motion_3.target_tau1 = (foot_motion_3.J.J00 * foot_motion_3.Fx + foot_motion_3.J.J10 * foot_motion_3.Fy)* joint_param_6.dir / joint_param_6.ratio;

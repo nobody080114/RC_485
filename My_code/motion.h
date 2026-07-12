@@ -53,7 +53,7 @@ typedef struct {
 typedef struct{
     float Fx,Fy;
     float Fx_real,Fy_real;
-    float G_0,G_1;
+    float G_0,G_1,G_2;
     uint16_t Kp_x,Kd_xt,Kd_xr;
     uint16_t Kp_y,Kd_yt,Kd_yr;
     uint16_t Kp_x_j,Kd_xt_j,Kd_xr_j;
