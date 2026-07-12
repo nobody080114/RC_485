@@ -373,7 +373,7 @@ int main(void)
             }
             else if(control_mode == 1)
             {
-                jump_F_set(speed_state);
+                jump_F_set();
                 PosPID_Set(&cmd_0,0.0f, 0.0f);  
                 PosPID_Set(&cmd_1,0.0f, 0.0f);
                 PosPID_Set(&cmd_2,0.0f, 0.0f);
@@ -470,7 +470,7 @@ void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim)
         static uint16_t count_1 = 0;
         // if(control_mode == 2)
         // {
-        DM_upset(&dt2);
+        DM_upset(&dt2,&dt3);
         // }
         count_1++;
         if(count_1>=1000)
@@ -612,7 +612,7 @@ void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim)
                   }
                   if(mode == 2)
                   { 
-                      if(set_flag == 0)
+                      if(set_flag_1 == 0)
                       {
                         if(cycle_go_dir == 1 || cycle_go_dir == 5 || cycle_go_dir == 6||cycle_go_dir == 3 || cycle_go_dir == 4)
                         {
@@ -695,19 +695,20 @@ void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim)
                           cmd_7.Pos = output_to_rotor(go_7_pos, &joint_param_7);
                         }   
                       }
-                      else 
+                      else if(set_flag_1 == 1)
                       {
-                        cmd_0.Pos = output_to_rotor(-PI, &joint_param_0); 
-                        cmd_1.Pos = output_to_rotor(0, &joint_param_1); 
-                        cmd_2.Pos = output_to_rotor(-PI, &joint_param_2); 
-                        cmd_3.Pos = output_to_rotor(0, &joint_param_3); 
-                        cmd_4.Pos = output_to_rotor(-PI, &joint_param_4); 
-                        cmd_5.Pos = output_to_rotor(0, &joint_param_5); 
-                        cmd_6.Pos = output_to_rotor(0, &joint_param_6); 
-                        cmd_7.Pos = output_to_rotor(-PI, &joint_param_7);  
-                      }
-    
-                               
+                        if(Enable)
+                        {
+                          cmd_0.Pos = output_to_rotor(-PI, &joint_param_0); 
+                          cmd_1.Pos = output_to_rotor(0, &joint_param_1); 
+                          cmd_2.Pos = output_to_rotor(-PI, &joint_param_2); 
+                          cmd_3.Pos = output_to_rotor(0, &joint_param_3); 
+                          cmd_4.Pos = output_to_rotor(-PI, &joint_param_4); 
+                          cmd_5.Pos = output_to_rotor(0, &joint_param_5); 
+                          cmd_6.Pos = output_to_rotor(0, &joint_param_6); 
+                          cmd_7.Pos = output_to_rotor(-PI, &joint_param_7);  
+                        }
+                      }                               
                   }
                 }
                 else if (control_mode == 1) 

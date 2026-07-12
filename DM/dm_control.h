@@ -14,7 +14,7 @@ typedef enum {
 // 3号电机POS调大则夹爪收紧，限位范围:0.0~1.2弧度(夹爪向内收最小为0弧度(7.2cm)即将碰上限位，向外张为-0.8弧度(30cm)即将碰上限位)
 
 #define P_KP	10.0f		// MIT模式P值
-#define P_KD	2.0f		// MIT模式D值
+#define P_KD	2.5f		// MIT模式D值
 #define P_KP_1	12.0f		// 2号电机MIT模式P值
 #define P_KD_1	4.0f		// 2号电机MIT模式D值
 #define V_KP	0.0f		// 速度模式P值
@@ -25,5 +25,5 @@ void dm_motor_ctrl_update(motor_t *motor, uint8_t mode, float pos_set, float vel
 void dm_motor_ctrl_save_pos_zero(motor_t *motor);
 void DM4310_Init(void);
 void DM_Ctrl(void);
-void DM_upset(uint16_t *cnt_dm);
+void DM_upset(uint16_t *cnt_dm,uint16_t *angle_cnt);
 #endif //CTRBOARD_CONTROL_H

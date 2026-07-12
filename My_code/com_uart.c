@@ -40,16 +40,8 @@ void COM_GetData(int8_t *go_dir,float *angle,uint8_t *turn,int8_t *set_flag,int8
     switch_speed = (int16_t)(COM_UART_RxData[9] << 8 | COM_UART_RxData[8]);
     go_speed = (int16_t)( (uint8_t)COM_UART_RxData[7] << 8 | (uint8_t)COM_UART_RxData[6] );
     *angle = (float)( (uint8_t)COM_UART_RxData[5] << 8 | (uint8_t)COM_UART_RxData[4] );
-    *turn = COM_UART_RxData[2];
-    *set_flag = COM_UART_RxData[3];
-    if(*turn!=0 || *turn!=0|| *set_flag!=0)
-    {
-        *set_flag_1 = 1;
-    }
-    else
-    {
-        *set_flag_1 = 0;
-    }
+    *set_flag_1 = COM_UART_RxData[2];//机械臂转入左侧开始识别
+    *set_flag = COM_UART_RxData[3];//是否堆叠放置
     switch_speed = COM_ClampSpeed(switch_speed, -40, 40);
     go_speed = COM_ClampSpeed(go_speed, -40, 40);
 

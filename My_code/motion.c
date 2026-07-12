@@ -11,7 +11,7 @@ double PI_VAL = 3.14159265358979323846;
 bool fivebar_forward(float theta1, float theta2, Point2D *P, bool elbow_up);
 bool fivebar_inverse(float x, float y,float *theta1,float *theta2,bool elbow_up);
 extern Foot_motion foot_motion_0,foot_motion_1,foot_motion_2,foot_motion_3;
-
+extern uint16_t speed_state;
 // 跳跃足端目标参数，单位：x/y 为 m，time 为 s，前馈力为 N。
 // 坐标约定：y 越负腿越伸长；x 越负表示足端向后蹬，机体获得向前趋势。
 float JUMP_STAND_X        = 0.000f;   // 站立/恢复时足端 x 位置。
@@ -20,17 +20,18 @@ float JUMP_CROUCH_X       = 0.000f;   // 下蹲阶段足端 x 位置，通常保
 float JUMP_CROUCH_Y       = -0.100f;  // 下蹲高度，越接近 0 腿收得越短，蓄力空间越大。
 float JUMP_THRUST_X       = -0.100f;  // 蹬伸阶段足端向后目标，越负向前跳得越远。
 float JUMP_THRUST_Y       = -0.250f;  // 蹬伸阶段腿伸长目标，越负向上蹬地越强。
-float JUMP_FLIGHT_X       = 0.040f;   // 腾空阶段收腿向前摆的位置，用于准备落地。
-float JUMP_FLIGHT_Y       = -0.13f;  // 腾空阶段收腿高度，越接近 0 越不容易拖地。
+float JUMP_FLIGHT_X       = 0.1173f;   // 腾空阶段收腿向前摆的位置，用于准备落地。
+float JUMP_FLIGHT_Y       = -0.0765f;  // 腾空阶段收腿高度，越接近 0 越不容易拖地。
 float JUMP_LAND_X         = 0.000f;   // 落地缓冲阶段足端 x 回中。
 float JUMP_LAND_Y         = -0.180f;  // 落地缓冲腿长，略低于站立高度用于吸收冲击。
 float JUMP_CROUCH_TIME    = 0.120f;   // 下蹲持续时间，过短会蓄力不足，过长动作拖沓。
 float JUMP_THRUST_TIME    = 0.110f;   // 蹬伸持续时间，增大可提高跳高/跳远，但过大会冲击大。
-float JUMP_FLIGHT_TIME    = 0.40f;   // 腾空最长等待时间，超时会强制进入落地缓冲。
+float JUMP_LEG_TIME    = 0.40f;   // 收腿时间
+float JUMP_FLIGHT_TIME    = 0.50f;   // 腾空最长等待时间，超时会强制进入落地缓冲。
 float JUMP_LAND_TIME      = 0.5f;   // 落地缓冲持续时间，增大可更软但恢复更慢。
 float JUMP_RECOVER_TIME   = 0.150f;   // 从落地缓冲恢复到站立的时间。
 float JUMP_THRUST_FF_X    = -20.0f;   // 蹬伸 x 方向前馈，越负向前冲量越大。
-float JUMP_THRUST_FF_Y    = -150.0f;   // 蹬伸 y 方向前馈，越负向上蹬地越强。
+float JUMP_THRUST_FF_Y    = -200.0f;   // 蹬伸 y 方向前馈，越负向上蹬地越强。
 float JUMP_LAND_FF_Y      = -8.0f;    // 落地阶段 y 方向轻微支撑前馈，用于辅助缓冲。
 float JUMP_LAND_Y_DETECT  = -0.160f;  // 落地检测阈值，至少两腿 current_P.y 大于该值认为触地。
 
@@ -158,7 +159,7 @@ void jump_reset(void)
     jump_ff_y = 0.0f;
 }
 
-void jump_F_set(uint16_t speed_state)
+void jump_F_set(void)
 {
     if(speed_state == 3)
     {
@@ -167,17 +168,20 @@ void jump_F_set(uint16_t speed_state)
         JUMP_CROUCH_Y       = -0.100f;  // 下蹲高度，越接近 0 腿收得越短，蓄力空间越大。
         JUMP_THRUST_X       = -0.100f;  // 蹬伸阶段足端向后目标，越负向前跳得越远。
         JUMP_THRUST_Y       = -0.250f;  // 蹬伸阶段腿伸长目标，越负向上蹬地越强。
-        JUMP_FLIGHT_X       = 0.040f;   // 腾空阶段收腿向前摆的位置，用于准备落地。
-        JUMP_FLIGHT_Y       = -0.07f;  // 腾空阶段收腿高度，越接近 0 越不容易拖地。
+        JUMP_FLIGHT_X       = 0.1173f;   // 腾空阶段收腿向前摆的位置，用于准备落地。
+        JUMP_FLIGHT_Y       = -0.0765f;  // 腾空阶段收腿高度，越接近 0 越不容易拖地。
         JUMP_LAND_X         = 0.000f;   // 落地缓冲阶段足端 x 回中。
         JUMP_LAND_Y         = -0.180f;  // 落地缓冲腿长，略低于站立高度用于吸收冲击。
         JUMP_CROUCH_TIME    = 0.120f;   // 下蹲持续时间，过短会蓄力不足，过长动作拖沓。
         JUMP_THRUST_TIME    = 0.110f;   // 蹬伸持续时间，增大可提高跳高/跳远，但过大会冲击大。
-        JUMP_FLIGHT_TIME    = 1.00f;   // 腾空最长等待时间，超时会强制进入落地缓冲。
-        JUMP_LAND_TIME      = 1.0f;   // 落地缓冲持续时间，增大可更软但恢复更慢。
+        JUMP_LEG_TIME    = 0.30f;   // 收腿时间
+        JUMP_FLIGHT_TIME    = 0.40f;   // 腾空最长等待时间，超时会强制进入落地缓冲。
+        JUMP_LAND_TIME      = 0.5f;   // 落地缓冲持续时间，增大可更软但恢复更慢。
         JUMP_RECOVER_TIME   = 0.150f;   // 从落地缓冲恢复到站立的时间。
-        JUMP_THRUST_FF_X    = -50.0f;   // 蹬伸 x 方向前馈，越负向前冲量越大。
-        JUMP_THRUST_FF_Y    = -300.0f;   // 蹬伸 y 方向前馈，越负向上蹬地越强。
+        JUMP_THRUST_FF_X    = -20.0f;   // 蹬伸 x 方向前馈，越负向前冲量越大。
+        JUMP_THRUST_FF_Y    = -200.0f;   // 蹬伸 y 方向前馈，越负向上蹬地越强。
+        JUMP_LAND_FF_Y      = -8.0f;    // 落地阶段 y 方向轻微支撑前馈，用于辅助缓冲。
+        JUMP_LAND_Y_DETECT  = -0.160f;  // 落地检测阈值，至少两腿 current_P.y 大于该值认为触地。
     }
     else if(speed_state == 2)
     {
@@ -270,7 +274,11 @@ void jump_update(float dt)
             jump_ff_y = JUMP_THRUST_FF_Y;
             break;
         case JUMP_FLIGHT:
-            duration = JUMP_FLIGHT_TIME;
+            if(speed_state == 3)
+            {
+              duration = JUMP_LEG_TIME;
+            }
+            else duration = JUMP_FLIGHT_TIME;
             break;
         case JUMP_LAND:
             duration = JUMP_LAND_TIME;
@@ -288,27 +296,65 @@ void jump_update(float dt)
     phase = clamp01(jump_state_time / duration);
     target_x = jump_start_x + (jump_end_x - jump_start_x) * phase;
     target_y = jump_start_y + (jump_end_y - jump_start_y) * phase;
-    if(stair_jump_enable && (jump_state == JUMP_LAND || jump_state == JUMP_RECOVER)) {
+    if(stair_jump_enable && (jump_state == JUMP_LAND || jump_state == JUMP_RECOVER)) 
+    {
         float front_y = target_y + STAIR_JUMP_HEIGHT;
         if(front_y > STAIR_JUMP_FRONT_Y_LIMIT) front_y = STAIR_JUMP_FRONT_Y_LIMIT;
         set_front_rear_feet_target(target_x, front_y, target_x, target_y, dt);
-    } else {
+    } 
+    else 
+    {
         set_all_feet_target(target_x, target_y, dt);
     }
-
-    if(jump_state == JUMP_CROUCH && jump_state_time >= JUMP_CROUCH_TIME) {
-        jump_enter_state(JUMP_THRUST, JUMP_THRUST_X, JUMP_THRUST_Y);
-    } else if(jump_state == JUMP_THRUST && jump_state_time >= JUMP_THRUST_TIME) {
-        jump_enter_state(JUMP_FLIGHT, JUMP_FLIGHT_X, JUMP_FLIGHT_Y);
-    } else if(jump_state == JUMP_FLIGHT &&
-              ((jump_state_time > 0.040f && jump_land_detected()) || jump_state_time >= JUMP_FLIGHT_TIME)) {
-        jump_enter_state(JUMP_LAND, JUMP_LAND_X, JUMP_LAND_Y);
-    } else if(jump_state == JUMP_LAND && jump_state_time >= JUMP_LAND_TIME) {
-        jump_enter_state(JUMP_RECOVER, JUMP_STAND_X, JUMP_STAND_Y);
-    } else if(jump_state == JUMP_RECOVER && jump_state_time >= JUMP_RECOVER_TIME) {
-        jump_reset();
-        set_all_feet_target(JUMP_STAND_X, JUMP_STAND_Y, dt);
+    if(speed_state == 3)
+    {
+        if(jump_state == JUMP_CROUCH && jump_state_time >= JUMP_CROUCH_TIME) 
+        {
+            jump_enter_state(JUMP_THRUST, JUMP_THRUST_X, JUMP_THRUST_Y);
+        } 
+        else if(jump_state == JUMP_THRUST && jump_state_time >= JUMP_THRUST_TIME) 
+        {
+            jump_enter_state(JUMP_FLIGHT, JUMP_FLIGHT_X, JUMP_FLIGHT_Y);
+        } 
+        else if(jump_state == JUMP_FLIGHT &&((jump_state_time > 0.50f && jump_land_detected()) || jump_state_time >= JUMP_FLIGHT_TIME)) 
+        {
+            jump_enter_state(JUMP_LAND, JUMP_LAND_X, JUMP_LAND_Y);
+        } 
+        else if(jump_state == JUMP_LAND && jump_state_time >= JUMP_LAND_TIME) 
+        {
+            jump_enter_state(JUMP_RECOVER, JUMP_STAND_X, JUMP_STAND_Y);
+        } 
+        else if(jump_state == JUMP_RECOVER && jump_state_time >= JUMP_RECOVER_TIME) 
+        {
+            jump_reset();
+            set_all_feet_target(JUMP_STAND_X, JUMP_STAND_Y, dt);
+        }
     }
+    else if (speed_state == 1) 
+    {
+        if(jump_state == JUMP_CROUCH && jump_state_time >= JUMP_CROUCH_TIME) 
+        {
+            jump_enter_state(JUMP_THRUST, JUMP_THRUST_X, JUMP_THRUST_Y);
+        } 
+        else if(jump_state == JUMP_THRUST && jump_state_time >= JUMP_THRUST_TIME) 
+        {
+            jump_enter_state(JUMP_FLIGHT, JUMP_FLIGHT_X, JUMP_FLIGHT_Y);
+        } 
+        else if(jump_state == JUMP_FLIGHT &&((jump_state_time > 0.040f && jump_land_detected()) || jump_state_time >= JUMP_FLIGHT_TIME)) 
+        {
+            jump_enter_state(JUMP_LAND, JUMP_LAND_X, JUMP_LAND_Y);
+        } 
+        else if(jump_state == JUMP_LAND && jump_state_time >= JUMP_LAND_TIME) 
+        {
+            jump_enter_state(JUMP_RECOVER, JUMP_STAND_X, JUMP_STAND_Y);
+        } 
+        else if(jump_state == JUMP_RECOVER && jump_state_time >= JUMP_RECOVER_TIME) 
+        {
+            jump_reset();
+            set_all_feet_target(JUMP_STAND_X, JUMP_STAND_Y, dt);
+        }    
+    }
+    
 }
 /*
  * @brief  椭圆轨迹足端位置计算

@@ -90,7 +90,7 @@ void nav_update_step_length(int16_t go_speed_cm_s, int16_t switch_speed_cm_s, fl
 void apply_curve_step_length(uint8_t dir, float base_step,float inner_ratio);
 void jump_reset(void);
 void jump_update(float dt);
-void jump_F_set(uint16_t speed_state);
+void jump_F_set();
 extern int8_t jump_start_req,jump_armed;
 extern float jump_ff_x,jump_ff_y;
 extern JumpState jump_state;
